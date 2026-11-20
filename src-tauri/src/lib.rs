@@ -1,4 +1,5 @@
 mod compiler;
+mod debugger;
 mod formatter;
 mod fs_ops;
 mod runner;
@@ -10,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(runner::RunnerState::default())
+        .manage(debugger::DebuggerState::default())
         .invoke_handler(tauri::generate_handler![
             toolchain::detect_toolchain,
             fs_ops::list_workspace_files,
@@ -23,6 +25,13 @@ pub fn run() {
             runner::send_program_stdin,
             runner::stop_running_program,
             formatter::format_with_astyle,
+            debugger::debug_start,
+            debugger::debug_continue,
+            debugger::debug_step_into,
+            debugger::debug_step_over,
+            debugger::debug_step_out,
+            debugger::debug_evaluate,
+            debugger::debug_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DEVSHOW C++");

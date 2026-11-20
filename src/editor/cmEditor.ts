@@ -56,9 +56,32 @@ const setBreakpointsEffect = StateEffect.define<number[]>();
 const setDiagnosticsEffect = StateEffect.define<
   Array<{ line: number; severity: "error" | "warning" }>
 >();
+const setDebugLineEffect = StateEffect.define<number | null>();
 
 const diagErrorLineDeco = Decoration.line({ class: "cm-diag-error" });
 const diagWarnLineDeco = Decoration.line({ class: "cm-diag-warning" });
+const debugLineDeco = Decoration.line({ class: "cm-debug-line" });
+
+const debugLineField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decos, tr) {
+    let next = decos.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setDebugLineEffect)) {
+        if (e.value !== null && e.value >= 1 && e.value <= tr.state.doc.lines) {
+          const from = tr.state.doc.line(e.value).from;
+          next = Decoration.set([debugLineDeco.range(from)]);
+        } else {
+          next = Decoration.none;
+        }
+      }
+    }
+    return next;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 const diagnosticLinesField = StateField.define<DecorationSet>({
   create() {
@@ -358,6 +381,10 @@ const devShowEditorTheme = EditorView.theme({
     backgroundColor: "rgba(245, 158, 11, 0.12)",
     boxShadow: "inset 3px 0 0 var(--warning)",
   },
+  ".cm-debug-line": {
+    backgroundColor: "rgba(245, 158, 11, 0.22)",
+    boxShadow: "inset 3px 0 0 var(--warning)",
+  },
 });
 
 export interface EditorCallbacks {
@@ -401,6 +428,7 @@ export class DevShowEditor {
     return [
       breakpointField,
       diagnosticLinesField,
+      debugLineField,
       bpGutter,
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -571,6 +599,12 @@ export class DevShowEditor {
   ): void {
     this.view.dispatch({
       effects: setDiagnosticsEffect.of(items),
+    });
+  }
+
+  public setDebugLine(lineNo: number | null): void {
+    this.view.dispatch({
+      effects: setDebugLineEffect.of(lineNo),
     });
   }
 

@@ -282,6 +282,7 @@
             </button>
             <button
               class="rail-btn"
+              id="railDebugBtn"
               data-panel="debug"
               type="button"
               title="Memória, Ponteiros & Breakpoints"
@@ -291,6 +292,7 @@
                 <rect x="14" y="13" width="7" height="7" rx="1" />
                 <path d="M10 7.5h4a2 2 0 0 1 2 2V13" />
               </svg>
+              <span class="rail-dot"></span>
             </button>
           </div>
           <div class="rail-group">
@@ -375,6 +377,58 @@
                 <span class="breadcrumb-sym" id="crumbSymbol">main()</span>
               </div>
               <span class="block-chip" id="blockChip">C11 · Pronto</span>
+            </div>
+
+            <!-- Floating Contextual Debug Bar (GDB/MI2) -->
+            <div class="debug-floating-bar hidden" id="debugFloatingBar">
+              <span class="debug-pill-label"
+                ><span class="pulse-dot"></span>GDB ATIVO</span
+              >
+              <button
+                class="btn btn-ghost"
+                id="btnDbgContinue"
+                type="button"
+                style="height: 26px; padding: 0 8px"
+                title="Continuar (F5)"
+              >
+                <span>Continue <span class="kbd">F5</span></span>
+              </button>
+              <button
+                class="btn btn-ghost"
+                id="btnDbgInto"
+                type="button"
+                style="height: 26px; padding: 0 8px"
+                title="Entrar na Função / Step Into (F7)"
+              >
+                <span>Step Into <span class="kbd">F7</span></span>
+              </button>
+              <button
+                class="btn btn-ghost"
+                id="btnDbgOver"
+                type="button"
+                style="height: 26px; padding: 0 8px"
+                title="Próxima Linha / Step Over (F8)"
+              >
+                <span>Step Over <span class="kbd">F8</span></span>
+              </button>
+              <button
+                class="btn btn-ghost"
+                id="btnDbgOut"
+                type="button"
+                style="height: 26px; padding: 0 8px"
+                title="Sair da Função / Step Out (Shift+F8)"
+              >
+                <span>Step Out</span>
+              </button>
+              <button
+                class="btn btn-ghost"
+                id="btnDbgStop"
+                type="button"
+                style="height: 26px; padding: 0 8px; color: var(--error)"
+                title="Encerrar Depuração (F6)"
+              >
+                <span>Parar <span class="kbd">F6</span></span>
+              </button>
             </div>
 
             <!-- CodeMirror 6 Mounts -->

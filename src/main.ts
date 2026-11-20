@@ -3,15 +3,26 @@ import {
   COMPILER_PROFILES,
   ROTEIRO_LESSONS,
 } from "./data/cContent";
+import { renderLiveMemoryPanel } from "./debug/memoryView";
 import { DevShowEditor } from "./editor/cmEditor";
 import {
   compileSource,
   createFileFromTemplate,
+  debugContinue,
+  debugEvaluate,
+  debugStart,
+  debugStepInto,
+  debugStepOut,
+  debugStepOver,
+  debugStop,
   detectToolchain,
   ensureRoteiroWorkspace,
   formatWithAStyle,
   isTauriRuntime,
   listWorkspaceFiles,
+  onDebugExited,
+  onDebugOutput,
+  onDebugStopped,
   onRunnerExit,
   onRunnerOutput,
   pickFolderDialog,
@@ -26,6 +37,8 @@ import {
 } from "./ipc/tauriBridge";
 import type {
   CompileDiagnostic,
+  DebugBreakpointSpec,
+  DebugSnapshot,
   DrawerTab,
   EditorSettings,
   KeymapMode,
@@ -35,6 +48,7 @@ import type {
   SymbolItem,
   ThemeMode,
   ToolchainReport,
+  TraceEntry,
   WorkspaceEntry,
 } from "./types";
 
@@ -74,6 +88,12 @@ interface AppState {
   isRunning: boolean;
   activeRunId: number | null;
   useConsolePauser: boolean;
+  debugActive: boolean;
+  debugSnapshot: DebugSnapshot | null;
+  prevVarValues: Map<string, string>;
+  traceHistory: TraceEntry[];
+  evalExpr: string;
+  evalOutput: string | null;
   terminalChunks: TerminalChunk[];
   compileLog: string[];
   settings: EditorSettings;
@@ -103,10 +123,16 @@ const state: AppState = {
   isRunning: false,
   activeRunId: null,
   useConsolePauser: false,
+  debugActive: false,
+  debugSnapshot: null,
+  prevVarValues: new Map<string, string>(),
+  traceHistory: [],
+  evalExpr: "",
+  evalOutput: null,
   terminalChunks: [
     {
       cls: "term-muted",
-      text: "DEVSHOW C++ · Pronto para compilar e executar em C11 (F9 Compile · F10 Run · F11 Compile & Run · Ctrl+Shift+A AStyle)\n",
+      text: "DEVSHOW C++ · Pronto para compilar, executar e depurar (F9 Compile · F11 Run · F5 Debug GDB · F7 Into · F8 Over)\n",
     },
   ],
   compileLog: [
@@ -396,6 +422,7 @@ function activateTab(path: string): void {
     state.breakpoints.get(tab.path) ?? []
   );
   applyDiagnosticsToEditor();
+  applyDebugLineToEditor();
   syncSecondaryEditor();
   renderAll();
 }
@@ -804,6 +831,216 @@ async function jumpToDiagnostic(diag: CompileDiagnostic): Promise<void> {
   primaryEditor.goToLine(diag.line);
 }
 
+// ===================== REAL GDB/MI2 DEBUGGER (ENTREGA 3) =====================
+function applyDebugLineToEditor(): void {
+  const snap = state.debugSnapshot;
+  const tab = getActiveTab();
+  if (!state.debugActive || !snap || !tab) {
+    primaryEditor.setDebugLine(null);
+    return;
+  }
+  const sameFile =
+    !snap.file ||
+    normalizePathKey(snap.file) === normalizePathKey(tab.path) ||
+    baseName(snap.file).toLowerCase() === tab.name.toLowerCase();
+  primaryEditor.setDebugLine(sameFile ? snap.line : null);
+}
+
+function syncDebugControls(): void {
+  el<HTMLDivElement>("debugFloatingBar").classList.toggle("hidden", !state.debugActive);
+  el<HTMLButtonElement>("railDebugBtn").classList.toggle("has-badge", state.debugActive);
+}
+
+async function startOrContinueDebug(): Promise<void> {
+  if (!isTauriRuntime()) {
+    toast("Depuração real via gdb.exe requer o app desktop (npm run tauri dev).");
+    return;
+  }
+  if (state.debugActive) {
+    try {
+      await debugContinue();
+    } catch (err) {
+      toast(`Erro GDB Continue: ${String(err)}`);
+    }
+    return;
+  }
+
+  const tab = getActiveTab();
+  if (!tab) {
+    toast("Abra um arquivo .c ou .cpp para depurar.");
+    return;
+  }
+  if (tab.dirty || tab.virtualOnly) {
+    const ok = await saveActiveTab(false);
+    if (!ok) return;
+  }
+
+  // Always compile with -g -O0 so GDB has exact DWARF line & variable symbols
+  const isCpp = ["cpp", "cc", "cxx", "hpp"].includes(tab.ext);
+  const compiler: "gcc" | "g++" = isCpp ? "g++" : "gcc";
+  const debugFlags = isCpp
+    ? ["-std=c++17", "-Wall", "-Wextra", "-g", "-O0", "-static-libgcc"]
+    : ["-std=c11", "-Wall", "-Wextra", "-g", "-O0", "-static-libgcc"];
+
+  state.isCompiling = true;
+  state.drawerOpen = true;
+  renderStatus();
+
+  try {
+    const res = await compileSource(tab.path, compiler, debugFlags);
+    state.diagnostics = res.diagnostics;
+    applyDiagnosticsToEditor();
+
+    if (!res.success) {
+      state.drawerTab = "problems";
+      renderAll();
+      toast("Corrija os erros de compilação antes de depurar.");
+      return;
+    }
+
+    const bpSpecs: DebugBreakpointSpec[] = [];
+    state.breakpoints.forEach((lines, path) => {
+      for (const line of lines) {
+        bpSpecs.push({ file: path, line });
+      }
+    });
+
+    state.debugActive = true;
+    state.debugSnapshot = null;
+    state.prevVarValues.clear();
+    state.traceHistory = [];
+    state.evalOutput = null;
+    state.sidebarOpen = true;
+    state.sidebarPanel = "debug";
+    state.drawerTab = "trace";
+    state.terminalChunks = [
+      {
+        cls: "term-ok",
+        text: `✓ Compilado com símbolos de depuração (-g -O0) em ${res.duration_ms} ms\n▶ Iniciando gdb.exe --interpreter=mi2...\n`,
+      },
+    ];
+    syncDebugControls();
+    renderAll();
+
+    await debugStart(res.executable_path, bpSpecs);
+    toast(
+      bpSpecs.length > 0
+        ? `GDB iniciado com ${bpSpecs.length} breakpoint(s).`
+        : "GDB iniciado (parando no início da main · use F7/F8)."
+    );
+  } catch (err) {
+    state.debugActive = false;
+    syncDebugControls();
+    toast(`Erro ao iniciar GDB: ${String(err)}`);
+  } finally {
+    state.isCompiling = false;
+    renderStatus();
+  }
+}
+
+async function stepIntoDebug(): Promise<void> {
+  if (!state.debugActive) return;
+  try {
+    await debugStepInto();
+  } catch (err) {
+    toast(`Erro Step Into: ${String(err)}`);
+  }
+}
+
+async function stepOverDebug(): Promise<void> {
+  if (!state.debugActive) return;
+  try {
+    await debugStepOver();
+  } catch (err) {
+    toast(`Erro Step Over: ${String(err)}`);
+  }
+}
+
+async function stepOutDebug(): Promise<void> {
+  if (!state.debugActive) return;
+  try {
+    await debugStepOut();
+  } catch (err) {
+    toast(`Erro Step Out: ${String(err)}`);
+  }
+}
+
+async function stopDebugSession(): Promise<void> {
+  if (!state.debugActive) return;
+  try {
+    await debugStop();
+  } catch (err) {
+    toast(`Erro ao encerrar GDB: ${String(err)}`);
+  }
+  state.debugActive = false;
+  state.debugSnapshot = null;
+  primaryEditor.setDebugLine(null);
+  syncDebugControls();
+  renderAll();
+}
+
+async function handleDebugStopped(snapshot: DebugSnapshot): Promise<void> {
+  state.debugActive = true;
+  state.debugSnapshot = snapshot;
+
+  // Compute diff for Teste de Mesa (Trace Table)
+  const changes: string[] = [];
+  const nextMap = new Map<string, string>();
+  const summaryParts: string[] = [];
+  for (const v of snapshot.variables) {
+    const key = `${snapshot.func}:${v.name}`;
+    const displayVal = v.deref_value ? `${v.value} (*=${v.deref_value})` : v.value;
+    nextMap.set(key, displayVal);
+    summaryParts.push(`${v.name}=${v.value}`);
+    const prev = state.prevVarValues.get(key);
+    if (prev === undefined) {
+      changes.push(`${v.name}=${v.value}`);
+    } else if (prev !== displayVal) {
+      changes.push(`${v.name}: ${prev} → ${displayVal}`);
+    }
+  }
+  state.prevVarValues = nextMap;
+
+  state.traceHistory.push({
+    step: state.traceHistory.length + 1,
+    fileName: snapshot.file ? baseName(snapshot.file) : "—",
+    line: snapshot.line,
+    func: snapshot.func,
+    summary: summaryParts.slice(0, 6).join(" · ") || "—",
+    changes: changes.slice(0, 4).join(" | ") || snapshot.reason,
+  });
+  if (state.traceHistory.length > 150) {
+    state.traceHistory.shift();
+  }
+
+  // Navigate to stopped file & line
+  if (snapshot.file && (/^[a-zA-Z]:[\\/]/.test(snapshot.file) || snapshot.file.startsWith("/"))) {
+    const active = getActiveTab();
+    if (!active || normalizePathKey(active.path) !== normalizePathKey(snapshot.file)) {
+      await openDiskFile(snapshot.file);
+    }
+  }
+  applyDebugLineToEditor();
+  primaryEditor.goToLine(snapshot.line);
+  syncDebugControls();
+  renderAll();
+}
+
+async function handleDebugEvaluate(expr: string): Promise<void> {
+  state.evalExpr = expr;
+  if (!state.debugActive) {
+    toast("Inicie a depuração (F5) antes de avaliar expressões.");
+    return;
+  }
+  try {
+    const val = await debugEvaluate(expr);
+    state.evalOutput = `${expr} = ${val}`;
+  } catch (err) {
+    state.evalOutput = `Erro: ${String(err)}`;
+  }
+  renderSidebar();
+}
+
 // ===================== TOOLCHAIN =====================
 async function loadToolchain(): Promise<void> {
   const report = await detectToolchain();
@@ -1001,26 +1238,75 @@ function renderSidebar(): void {
           : `<div class="muted-hint" style="padding:8px;">Digite 2+ caracteres para buscar nos arquivos do workspace via Rust.</div>`
       }`;
   } else if (state.sidebarPanel === "debug") {
-    titleEl.textContent = "Memória & Breakpoints";
+    titleEl.textContent = "Memória, Ponteiros & GDB";
+    const snap = state.debugSnapshot;
     const allBps: Array<{ path: string; name: string; line: number }> = [];
     state.breakpoints.forEach((lines, path) => {
       for (const line of lines) {
         allBps.push({ path, name: baseName(path), line });
       }
     });
+
+    const localsHtml =
+      snap && snap.variables.length > 0
+        ? snap.variables
+            .map(
+              (v) => `
+            <div class="watch-row" title="${escapeHtml(`${v.var_type} ${v.name}${v.address ? ` @ ${v.address}` : ""}`)}">
+              <span class="watch-name">${escapeHtml(v.name)}</span>
+              <span class="watch-val">${escapeHtml(v.deref_value ? `${v.value} → ${v.deref_value}` : v.value)}</span>
+            </div>`
+            )
+            .join("")
+        : `<div class="muted-hint">${state.debugActive ? "Sem variáveis locais neste ponto." : "Inicie com F5 para inspecionar."}</div>`;
+
+    const stackHtml =
+      snap && snap.frames.length > 0
+        ? snap.frames
+            .map(
+              (fr) => `
+            <button class="tree-item" style="padding:4px 6px;" ${fr.file ? `data-search-path="${escapeHtml(fr.file)}" data-search-line="${fr.line}"` : ""} type="button">
+              <span style="font-family:var(--font-mono);font-size:11.5px;">#${fr.level} ${escapeHtml(fr.func)}()</span>
+              <span class="ext-badge">${fr.file ? `${escapeHtml(baseName(fr.file))}:${fr.line}` : fr.addr}</span>
+            </button>`
+            )
+            .join("")
+        : `<div class="muted-hint">Nenhuma pilha ativa.</div>`;
+
     body.innerHTML = `
       <div class="debug-card">
         <div class="debug-card-title">
-          <span>Visualizador de Memória (SVG)</span>
-          <span>ENTREGA 3</span>
+          <span>Memória &amp; Ponteiros (SVG)</span>
+          <span>${state.debugActive ? (snap ? `${escapeHtml(snap.func)}:${snap.line}` : "RODANDO") : "IDLE"}</span>
         </div>
-        <div class="muted-hint" style="line-height:1.45;">
-          Na <strong>Entrega 3</strong>, este painel receberá variáveis, endereços (<code>&amp;x</code>) e ponteiros (<code>*p</code>, <code>a-&gt;campo</code>) ao vivo via <code>gdb.exe --interpreter=mi2</code>.
-        </div>
+        ${renderLiveMemoryPanel(snap)}
       </div>
+
       <div class="debug-card">
         <div class="debug-card-title">
-          <span>Breakpoints Ativos (Calha CM6)</span>
+          <span>Variáveis Locais</span>
+          <span>${snap ? snap.variables.length : 0}</span>
+        </div>
+        ${localsHtml}
+      </div>
+
+      <div class="debug-card">
+        <div class="debug-card-title"><span>Avaliar Expressão C</span></div>
+        <form class="eval-row" id="dbgEvalForm">
+          <input class="text-input" id="dbgEvalInput" style="flex:1;height:26px;font-family:var(--font-mono);font-size:11.5px;" placeholder="*p, &x, a->nota..." value="${escapeHtml(state.evalExpr)}" />
+          <button class="btn btn-subtle" type="submit" style="height:26px;font-size:11px;padding:0 8px;">Avaliar</button>
+        </form>
+        ${state.evalOutput ? `<div class="eval-result">${escapeHtml(state.evalOutput)}</div>` : ""}
+      </div>
+
+      <div class="debug-card">
+        <div class="debug-card-title"><span>Call Stack</span><span>${snap ? snap.frames.length : 0}</span></div>
+        ${stackHtml}
+      </div>
+
+      <div class="debug-card">
+        <div class="debug-card-title">
+          <span>Breakpoints (Calha CM6)</span>
           <span>${allBps.length}</span>
         </div>
         ${
@@ -1035,7 +1321,7 @@ function renderSidebar(): void {
                 </button>`
                 )
                 .join("")
-            : `<div class="muted-hint">Clique na coluna esquerda do editor ou pressione <strong>F4</strong> para marcar breakpoints.</div>`
+            : `<div class="muted-hint">Clique na calha esquerda ou pressione <strong>F4</strong>.</div>`
         }
       </div>`;
   }
@@ -1089,7 +1375,36 @@ function renderDrawer(): void {
         .join("");
     }
   } else if (state.drawerTab === "trace") {
-    body.innerHTML = `<div class="term-muted" style="font-family:var(--font-ui);">A tabela automática de <strong>Teste de Mesa</strong> será alimentada pelo depurador GDB/MI na Entrega 3.</div>`;
+    if (state.traceHistory.length === 0) {
+      body.innerHTML = `<div class="term-muted" style="font-family:var(--font-ui);">Pressione <strong>F5 (Debug)</strong> e avance com <strong>F7 (Step Into)</strong> / <strong>F8 (Step Over)</strong> para preencher a tabela de <strong>Teste de Mesa</strong> em tempo real.</div>`;
+    } else {
+      body.innerHTML = `
+        <table class="trace-table">
+          <thead>
+            <tr>
+              <th>Passo</th>
+              <th>Local</th>
+              <th>Função</th>
+              <th>Estado das Variáveis</th>
+              <th>Mudanças / Evento</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.traceHistory
+              .map(
+                (t, idx) => `
+              <tr class="${idx === state.traceHistory.length - 1 ? "cur-step" : ""}">
+                <td>#${t.step}</td>
+                <td>${escapeHtml(t.fileName)}:${t.line}</td>
+                <td>${escapeHtml(t.func)}()</td>
+                <td>${escapeHtml(t.summary)}</td>
+                <td style="font-family:var(--font-ui);color:var(--emerald);">${escapeHtml(t.changes)}</td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>`;
+    }
   } else {
     body.innerHTML = state.compileLog
       .map((l) => `<div class="term-line term-muted">${escapeHtml(l)}</div>`)
@@ -1110,9 +1425,11 @@ function renderStatus(): void {
   const warns = state.diagnostics.filter((d) => d.severity === "warning").length;
   el<HTMLSpanElement>("statusDiag").textContent = state.isCompiling
     ? "Compilando..."
-    : state.isRunning
-      ? "Executando..."
-      : `${errs} erro(s) · ${warns} aviso(s)`;
+    : state.debugActive
+      ? "Depurando (GDB)..."
+      : state.isRunning
+        ? "Executando..."
+        : `${errs} erro(s) · ${warns} aviso(s)`;
 
   const profile =
     COMPILER_PROFILES.find((p) => p.id === state.selectedProfileId) ??
@@ -1187,6 +1504,10 @@ function getPaletteCommands(): PaletteCommand[] {
     { cat: "Build", label: "Compile (Compilar com gcc/g++)", kbd: "F9", run: () => { void compileActiveFile(false); } },
     { cat: "Build", label: "Run (Executar último executável)", kbd: "F10", run: () => { void runCurrentProgram(); } },
     { cat: "Build", label: "Parar Programa em Execução", kbd: "F6", run: () => { void stopExecution(); } },
+    { cat: "Debug", label: "Debug: Iniciar / Continuar (GDB/MI2)", kbd: "F5", run: () => { void startOrContinueDebug(); } },
+    { cat: "Debug", label: "Debug: Step Into (Entrar na Função)", kbd: "F7", run: () => { void stepIntoDebug(); } },
+    { cat: "Debug", label: "Debug: Step Over (Próxima Linha)", kbd: "F8", run: () => { void stepOverDebug(); } },
+    { cat: "Debug", label: "Debug: Parar Sessão GDB", kbd: "F6", run: () => { void stopDebugSession(); } },
     { cat: "AStyle", label: "Formatar Código Atual com AStyle.exe", kbd: "Ctrl+Shift+A", run: () => { void formatActiveWithAStyle(); } },
     { cat: "Arquivo", label: "Salvar Arquivo Atual", kbd: "Ctrl+S", run: () => { void saveActiveTab(false); } },
     { cat: "Arquivo", label: "Salvar Como...", kbd: "Ctrl+Shift+S", run: () => { void saveActiveTab(true); } },
@@ -1320,12 +1641,12 @@ function bindEvents(): void {
   el<HTMLButtonElement>("btnStopRun").addEventListener("click", () => { void stopExecution(); });
   el<HTMLButtonElement>("btnStopDrawer").addEventListener("click", () => { void stopExecution(); });
   el<HTMLButtonElement>("btnAStyle").addEventListener("click", () => { void formatActiveWithAStyle(); });
-  el<HTMLButtonElement>("btnDebug").addEventListener("click", () => {
-    state.sidebarOpen = true;
-    state.sidebarPanel = "debug";
-    renderSidebar();
-    toast("Depurador GDB/MI + Memória SVG ao vivo entra na Entrega 3!");
-  });
+  el<HTMLButtonElement>("btnDebug").addEventListener("click", () => { void startOrContinueDebug(); });
+  el<HTMLButtonElement>("btnDbgContinue").addEventListener("click", () => { void startOrContinueDebug(); });
+  el<HTMLButtonElement>("btnDbgInto").addEventListener("click", () => { void stepIntoDebug(); });
+  el<HTMLButtonElement>("btnDbgOver").addEventListener("click", () => { void stepOverDebug(); });
+  el<HTMLButtonElement>("btnDbgOut").addEventListener("click", () => { void stepOutDebug(); });
+  el<HTMLButtonElement>("btnDbgStop").addEventListener("click", () => { void stopDebugSession(); });
 
   el<HTMLButtonElement>("btnPalette").addEventListener("click", openPalette);
   el<HTMLButtonElement>("btnSplit").addEventListener("click", () => {
@@ -1468,6 +1789,15 @@ function bindEvents(): void {
     const target = e.target as HTMLElement;
     if (target.id === "sbSearchInput") {
       void runWorkspaceSearch((target as HTMLInputElement).value);
+    }
+  });
+
+  el<HTMLDivElement>("sidebarBody").addEventListener("submit", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.id === "dbgEvalForm") {
+      e.preventDefault();
+      const inp = document.getElementById("dbgEvalInput") as HTMLInputElement | null;
+      if (inp) void handleDebugEvaluate(inp.value);
     }
   });
 
@@ -1622,15 +1952,20 @@ function bindEvents(): void {
     } else if (e.key === "F11") {
       e.preventDefault();
       void compileActiveFile(true);
-    } else if (e.key === "F6" && state.isRunning) {
+    } else if (e.key === "F6" && (state.isRunning || state.debugActive)) {
       e.preventDefault();
-      void stopExecution();
+      if (state.debugActive) void stopDebugSession();
+      else void stopExecution();
     } else if (e.key === "F5") {
       e.preventDefault();
-      state.sidebarOpen = true;
-      state.sidebarPanel = "debug";
-      renderSidebar();
-      toast("Depurador GDB/MI + Memória SVG ao vivo entra na Entrega 3!");
+      void startOrContinueDebug();
+    } else if (e.key === "F7" && state.debugActive) {
+      e.preventDefault();
+      void stepIntoDebug();
+    } else if (e.key === "F8" && state.debugActive) {
+      e.preventDefault();
+      if (e.shiftKey) void stepOutDebug();
+      else void stepOverDebug();
     }
   });
 }
@@ -1656,6 +1991,27 @@ async function subscribeRunnerEvents(): Promise<void> {
     appendTerminalChunk(summary, ev.killed || ev.exit_code !== 0 ? "term-warn" : "term-ok");
     syncRunControls();
     renderStatus();
+  });
+
+  await onDebugStopped((snapshot) => {
+    void handleDebugStopped(snapshot);
+  });
+
+  await onDebugOutput((ev) => {
+    if (ev.stream === "target") {
+      appendTerminalChunk(ev.text, "");
+    } else if (ev.stream === "log") {
+      appendTerminalChunk(ev.text, "term-err");
+    }
+  });
+
+  await onDebugExited((ev) => {
+    state.debugActive = false;
+    state.debugSnapshot = null;
+    primaryEditor.setDebugLine(null);
+    syncDebugControls();
+    appendTerminalChunk(`\n■ Sessão GDB encerrada (${ev.reason}).\n`, "term-ok");
+    renderAll();
   });
 }
 

@@ -3,6 +3,10 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type {
   CompileResult,
+  DebugBreakpointSpec,
+  DebugExitEvent,
+  DebugOutputEvent,
+  DebugSnapshot,
   FileContent,
   FormatResult,
   RoteiroSeedFile,
@@ -181,4 +185,61 @@ export async function onRunnerExit(
 ): Promise<UnlistenFn> {
   if (!isTauriRuntime()) return () => {};
   return listen<RunnerExitEvent>("runner://exit", (ev) => handler(ev.payload));
+}
+
+export async function debugStart(
+  executablePath: string,
+  breakpoints: DebugBreakpointSpec[],
+  baseDir?: string
+): Promise<void> {
+  return invoke<void>("debug_start", {
+    executablePath,
+    breakpoints,
+    baseDir: baseDir ?? null,
+  });
+}
+
+export async function debugContinue(): Promise<void> {
+  return invoke<void>("debug_continue");
+}
+
+export async function debugStepInto(): Promise<void> {
+  return invoke<void>("debug_step_into");
+}
+
+export async function debugStepOver(): Promise<void> {
+  return invoke<void>("debug_step_over");
+}
+
+export async function debugStepOut(): Promise<void> {
+  return invoke<void>("debug_step_out");
+}
+
+export async function debugEvaluate(expression: string): Promise<string> {
+  return invoke<string>("debug_evaluate", { expression });
+}
+
+export async function debugStop(): Promise<void> {
+  return invoke<void>("debug_stop");
+}
+
+export async function onDebugStopped(
+  handler: (snapshot: DebugSnapshot) => void
+): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return () => {};
+  return listen<DebugSnapshot>("debug://stopped", (ev) => handler(ev.payload));
+}
+
+export async function onDebugOutput(
+  handler: (ev: DebugOutputEvent) => void
+): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return () => {};
+  return listen<DebugOutputEvent>("debug://output", (ev) => handler(ev.payload));
+}
+
+export async function onDebugExited(
+  handler: (ev: DebugExitEvent) => void
+): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return () => {};
+  return listen<DebugExitEvent>("debug://exited", (ev) => handler(ev.payload));
 }

@@ -672,6 +672,18 @@
           </div>
           <div class="setting-row">
             <div class="setting-label">
+              <strong>Tamanho da Tabulação</strong>
+              <span>Espaços por nível de indentação no editor e no AStyle.</span>
+            </div>
+            <div class="setting-control">
+              <select id="setTabSize">
+                <option value="2">2 espaços</option>
+                <option value="4" selected>4 espaços (Padrão)</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
               <strong>Estilo AStyle</strong>
               <span>Preset para formatação C (AStyle.exe).</span>
             </div>
@@ -699,15 +711,32 @@
           <div class="toolchain-box">
             <div class="toolchain-box-header">
               <strong>Toolchain Dev-C++ 5.11 (Somente Leitura)</strong>
-              <button
-                class="btn btn-subtle"
-                id="btnRefreshToolchain"
-                type="button"
-                style="height: 24px; font-size: 11px"
-              >
-                Reverificar
-              </button>
+              <div style="display: flex; gap: 6px">
+                <button
+                  class="btn btn-subtle"
+                  id="btnPickToolchainDir"
+                  type="button"
+                  style="height: 24px; font-size: 11px"
+                >
+                  Escolher Pasta
+                </button>
+                <button
+                  class="btn btn-subtle"
+                  id="btnRefreshToolchain"
+                  type="button"
+                  style="height: 24px; font-size: 11px"
+                >
+                  Reverificar
+                </button>
+              </div>
             </div>
+            <input
+              id="setToolchainDir"
+              class="text-input"
+              type="text"
+              style="width: 100%; margin-bottom: 6px; font-family: var(--font-mono); font-size: 11.5px"
+              value="C:\Program Files (x86)\Dev-Cpp"
+            />
             <div id="toolchainBaseDir" class="muted-hint"></div>
             <ul class="tool-list" id="toolchainList"></ul>
           </div>

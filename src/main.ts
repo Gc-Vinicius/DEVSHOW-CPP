@@ -20,6 +20,7 @@ import {
   formatWithAStyle,
   isTauriRuntime,
   listWorkspaceFiles,
+  loadSettings,
   onDebugExited,
   onDebugOutput,
   onDebugStopped,
@@ -30,6 +31,7 @@ import {
   pickSaveFileDialog,
   readTextFile,
   runProgram,
+  saveSettings,
   searchInDirectory,
   sendProgramStdin,
   stopRunningProgram,
@@ -145,6 +147,10 @@ const state: AppState = {
     tabSize: 4,
     astyleStyle: "-A3",
     keymap: "hybrid",
+    defaultProfileId: COMPILER_PROFILES[0].id,
+    toolchainBaseDir: "C:\\Program Files (x86)\\Dev-Cpp",
+    useConsolePauser: false,
+    lastWorkspaceDir: null,
   },
 };
 
@@ -530,6 +536,8 @@ async function handleOpenFolder(): Promise<void> {
   const dir = await pickFolderDialog();
   if (!dir) return;
   state.workspaceDir = dir;
+  state.settings.lastWorkspaceDir = dir;
+  void persistSettings();
   state.sidebarOpen = true;
   state.sidebarPanel = "files";
   await refreshWorkspaceTree();
@@ -659,7 +667,12 @@ async function compileActiveFile(andRun: boolean): Promise<void> {
   renderStatus();
 
   try {
-    const res = await compileSource(tab.path, compiler, flags);
+    const res = await compileSource(
+      tab.path,
+      compiler,
+      flags,
+      state.settings.toolchainBaseDir
+    );
     state.diagnostics = res.diagnostics;
     applyDiagnosticsToEditor();
 
@@ -732,6 +745,7 @@ async function launchExecutable(
     const runId = await runProgram(executablePath, {
       workingDir,
       useConsolePauser: state.useConsolePauser,
+      baseDir: state.settings.toolchainBaseDir,
     });
     state.activeRunId = runId;
     syncRunControls();
@@ -802,7 +816,8 @@ async function formatActiveWithAStyle(): Promise<void> {
     const res = await formatWithAStyle(
       tab.content,
       state.settings.astyleStyle,
-      state.settings.tabSize
+      state.settings.tabSize,
+      state.settings.toolchainBaseDir
     );
     if (!res.changed) {
       toast(`Código já está formatado (${res.command_summary}).`);
@@ -887,7 +902,12 @@ async function startOrContinueDebug(): Promise<void> {
   renderStatus();
 
   try {
-    const res = await compileSource(tab.path, compiler, debugFlags);
+    const res = await compileSource(
+      tab.path,
+      compiler,
+      debugFlags,
+      state.settings.toolchainBaseDir
+    );
     state.diagnostics = res.diagnostics;
     applyDiagnosticsToEditor();
 
@@ -922,7 +942,7 @@ async function startOrContinueDebug(): Promise<void> {
     syncDebugControls();
     renderAll();
 
-    await debugStart(res.executable_path, bpSpecs);
+    await debugStart(res.executable_path, bpSpecs, state.settings.toolchainBaseDir);
     toast(
       bpSpecs.length > 0
         ? `GDB iniciado com ${bpSpecs.length} breakpoint(s).`
@@ -1041,9 +1061,67 @@ async function handleDebugEvaluate(expr: string): Promise<void> {
   renderSidebar();
 }
 
-// ===================== TOOLCHAIN =====================
+// ===================== TOOLCHAIN & SETTINGS PERSISTENCE =====================
+async function persistSettings(): Promise<void> {
+  try {
+    await saveSettings({
+      theme: state.settings.theme,
+      font_family: state.settings.fontFamily,
+      font_size_px: state.settings.fontSizePx,
+      tab_size: state.settings.tabSize,
+      astyle_style: state.settings.astyleStyle,
+      keymap: state.settings.keymap,
+      default_profile_id: state.selectedProfileId,
+      toolchain_base_dir: state.settings.toolchainBaseDir,
+      use_console_pauser: state.useConsolePauser,
+      last_workspace_dir: state.settings.lastWorkspaceDir,
+    });
+  } catch (err) {
+    toast(`Aviso ao salvar preferências: ${String(err)}`);
+  }
+}
+
+async function restorePersistedSettings(): Promise<void> {
+  try {
+    const saved = await loadSettings();
+    if (!saved) return;
+    state.settings.theme = saved.theme === "light" ? "light" : "dark";
+    state.settings.fontFamily = saved.font_family || state.settings.fontFamily;
+    state.settings.fontSizePx = Math.min(22, Math.max(11, saved.font_size_px || 14));
+    state.settings.tabSize = saved.tab_size === 2 ? 2 : 4;
+    if (saved.astyle_style === "-A1" || saved.astyle_style === "-A2" || saved.astyle_style === "-A3") {
+      state.settings.astyleStyle = saved.astyle_style;
+    }
+    state.settings.keymap = saved.keymap === "classic" ? "classic" : "hybrid";
+    if (COMPILER_PROFILES.some((p) => p.id === saved.default_profile_id)) {
+      state.selectedProfileId = saved.default_profile_id;
+      state.settings.defaultProfileId = saved.default_profile_id;
+    }
+    if (saved.toolchain_base_dir) {
+      state.settings.toolchainBaseDir = saved.toolchain_base_dir;
+    }
+    state.useConsolePauser = Boolean(saved.use_console_pauser);
+    state.settings.useConsolePauser = state.useConsolePauser;
+    state.settings.lastWorkspaceDir = saved.last_workspace_dir;
+  } catch {
+    // Keep defaults on error
+  }
+}
+
+function syncSettingsControls(): void {
+  el<HTMLSelectElement>("setTheme").value = state.settings.theme;
+  el<HTMLSelectElement>("setFont").value = state.settings.fontFamily;
+  el<HTMLSelectElement>("setFontSize").value = String(state.settings.fontSizePx);
+  el<HTMLSelectElement>("setTabSize").value = String(state.settings.tabSize);
+  el<HTMLSelectElement>("setAStyle").value = state.settings.astyleStyle;
+  el<HTMLSelectElement>("setKeymap").value = state.settings.keymap;
+  el<HTMLSelectElement>("compilerSelect").value = state.selectedProfileId;
+  el<HTMLInputElement>("chkConsolePauser").checked = state.useConsolePauser;
+  el<HTMLInputElement>("setToolchainDir").value = state.settings.toolchainBaseDir;
+}
+
 async function loadToolchain(): Promise<void> {
-  const report = await detectToolchain();
+  const report = await detectToolchain(state.settings.toolchainBaseDir);
   state.toolchain = report;
   const foundCount = report.tools.filter((t) => t.found).length;
   const gcc = report.tools.find((t) => t.name === "gcc");
@@ -1622,6 +1700,8 @@ function bindEvents(): void {
   ).join("");
   compSel.addEventListener("change", () => {
     state.selectedProfileId = compSel.value;
+    state.settings.defaultProfileId = compSel.value;
+    void persistSettings();
     renderStatus();
   });
 
@@ -1656,6 +1736,7 @@ function bindEvents(): void {
   el<HTMLButtonElement>("btnTheme").addEventListener("click", () => {
     const next: ThemeMode = state.settings.theme === "dark" ? "light" : "dark";
     applyTheme(next);
+    void persistSettings();
     toast(next === "dark" ? "Tema Obsidian Slate (Dark)" : "Tema Daylight Paper (Light)");
   });
   el<HTMLButtonElement>("btnSettings").addEventListener("click", () => openModal("settingsModal"));
@@ -1706,6 +1787,8 @@ function bindEvents(): void {
   // Drawer controls & tabs
   el<HTMLInputElement>("chkConsolePauser").addEventListener("change", (e) => {
     state.useConsolePauser = (e.target as HTMLInputElement).checked;
+    state.settings.useConsolePauser = state.useConsolePauser;
+    void persistSettings();
   });
   el<HTMLButtonElement>("btnClearTerminal").addEventListener("click", () => {
     state.terminalChunks = [];
@@ -1816,22 +1899,49 @@ function bindEvents(): void {
   // Settings
   el<HTMLSelectElement>("setTheme").addEventListener("change", (e) => {
     applyTheme((e.target as HTMLSelectElement).value as ThemeMode);
+    void persistSettings();
   });
   el<HTMLSelectElement>("setFont").addEventListener("change", (e) => {
     state.settings.fontFamily = (e.target as HTMLSelectElement).value;
     applyTypography();
+    void persistSettings();
   });
   el<HTMLSelectElement>("setFontSize").addEventListener("change", (e) => {
     state.settings.fontSizePx = Number((e.target as HTMLSelectElement).value);
     applyTypography();
+    void persistSettings();
+  });
+  el<HTMLSelectElement>("setTabSize").addEventListener("change", (e) => {
+    state.settings.tabSize = Number((e.target as HTMLSelectElement).value);
+    primaryEditor.setTabSize(state.settings.tabSize);
+    void persistSettings();
   });
   el<HTMLSelectElement>("setAStyle").addEventListener("change", (e) => {
     state.settings.astyleStyle = (e.target as HTMLSelectElement).value as "-A3" | "-A2" | "-A1";
+    void persistSettings();
     renderStatus();
   });
   el<HTMLSelectElement>("setKeymap").addEventListener("change", (e) => {
     state.settings.keymap = (e.target as HTMLSelectElement).value as KeymapMode;
+    void persistSettings();
     renderStatus();
+  });
+  el<HTMLInputElement>("setToolchainDir").addEventListener("change", (e) => {
+    const val = (e.target as HTMLInputElement).value.trim();
+    if (val) {
+      state.settings.toolchainBaseDir = val;
+      void persistSettings();
+      void loadToolchain();
+    }
+  });
+  el<HTMLButtonElement>("btnPickToolchainDir").addEventListener("click", () => {
+    void pickFolderDialog().then((dir) => {
+      if (!dir) return;
+      state.settings.toolchainBaseDir = dir;
+      el<HTMLInputElement>("setToolchainDir").value = dir;
+      void persistSettings();
+      void loadToolchain();
+    });
   });
 
   // Modals
@@ -2056,12 +2166,31 @@ window.addEventListener("DOMContentLoaded", () => {
     true
   );
 
-  applyTheme("dark");
-  applyTypography();
   initSplitters();
   bindEvents();
 
-  void subscribeRunnerEvents();
-  void loadToolchain();
-  void openRoteiroWorkspace();
+  void (async () => {
+    await restorePersistedSettings();
+    applyTheme(state.settings.theme);
+    applyTypography();
+    primaryEditor.setTabSize(state.settings.tabSize);
+    syncSettingsControls();
+    await subscribeRunnerEvents();
+    await loadToolchain();
+
+    if (state.settings.lastWorkspaceDir && isTauriRuntime()) {
+      try {
+        const entries = await listWorkspaceFiles(state.settings.lastWorkspaceDir);
+        state.workspaceDir = state.settings.lastWorkspaceDir;
+        state.workspaceEntries = entries;
+        const first = entries.find((e) => !e.is_dir);
+        if (first) await openDiskFile(first.path);
+        renderAll();
+        return;
+      } catch {
+        // Fallback to Roteiro workspace if saved folder no longer exists
+      }
+    }
+    await openRoteiroWorkspace();
+  })();
 });

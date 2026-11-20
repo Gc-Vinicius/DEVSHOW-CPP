@@ -302,6 +302,10 @@ const devShowEditorTheme = EditorView.theme({
     minWidth: "34px",
     padding: "0 8px 0 2px",
     fontSize: "12px",
+    cursor: "pointer",
+  },
+  ".cm-lineNumbers .cm-gutterElement:hover": {
+    color: "var(--text-primary)",
   },
   ".cm-bp-gutter": {
     width: "18px",
@@ -454,12 +458,71 @@ export class DevShowEditor {
       },
     });
 
+    const selectLineRange = (
+      view: EditorView,
+      anchorLineNo: number,
+      targetLineNo: number
+    ) => {
+      const doc = view.state.doc;
+      const clampedAnchor = Math.max(1, Math.min(anchorLineNo, doc.lines));
+      const clampedTarget = Math.max(1, Math.min(targetLineNo, doc.lines));
+      const startLine = doc.line(Math.min(clampedAnchor, clampedTarget));
+      const endLine = doc.line(Math.max(clampedAnchor, clampedTarget));
+      const endPos = endLine.number < doc.lines ? endLine.to + 1 : endLine.to;
+
+      const selection =
+        clampedTarget >= clampedAnchor
+          ? { anchor: startLine.from, head: endPos }
+          : { anchor: endPos, head: startLine.from };
+
+      view.dispatch({
+        selection,
+        effects: EditorView.scrollIntoView(selection.head),
+      });
+    };
+
+    const selectableLineNumbers = lineNumbers({
+      domEventHandlers: {
+        mousedown: (view, lineBlock, event) => {
+          const mouseEv = event as MouseEvent;
+          if (mouseEv.button !== 0) return false;
+          mouseEv.preventDefault();
+
+          const clickedLineNo = view.state.doc.lineAt(lineBlock.from).number;
+          const anchorLineNo = mouseEv.shiftKey
+            ? view.state.doc.lineAt(view.state.selection.main.anchor).number
+            : clickedLineNo;
+
+          view.focus();
+          selectLineRange(view, anchorLineNo, clickedLineNo);
+
+          const onMouseMove = (moveEv: MouseEvent) => {
+            const relY = moveEv.clientY - view.documentTop;
+            const targetBlock = view.lineBlockAtHeight(
+              Math.max(0, Math.min(relY, view.contentHeight))
+            );
+            const targetLineNo = view.state.doc.lineAt(targetBlock.from).number;
+            selectLineRange(view, anchorLineNo, targetLineNo);
+          };
+
+          const onMouseUp = () => {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+          };
+
+          window.addEventListener("mousemove", onMouseMove);
+          window.addEventListener("mouseup", onMouseUp);
+          return true;
+        },
+      },
+    });
+
     return [
       breakpointField,
       diagnosticLinesField,
       debugLineField,
       bpGutter,
-      lineNumbers(),
+      selectableLineNumbers,
       highlightActiveLineGutter(),
       foldGutter(),
       history(),

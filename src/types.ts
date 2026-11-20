@@ -138,3 +138,53 @@ export interface EditorSettings {
   astyleStyle: "-A3" | "-A2" | "-A1";
   keymap: KeymapMode;
 }
+
+export interface DebugBreakpointSpec {
+  file: string;
+  line: number;
+}
+
+export interface StackFrame {
+  level: number;
+  func: string;
+  file: string;
+  line: number;
+  addr: string;
+}
+
+export interface DebugVariable {
+  name: string;
+  var_type: string;
+  value: string;
+  address: string | null;
+  is_pointer: boolean;
+  points_to_addr: string | null;
+  deref_value: string | null;
+}
+
+export interface DebugSnapshot {
+  reason: string;
+  file: string;
+  line: number;
+  func: string;
+  frames: StackFrame[];
+  variables: DebugVariable[];
+}
+
+export interface DebugOutputEvent {
+  stream: "target" | "console" | "log";
+  text: string;
+}
+
+export interface DebugExitEvent {
+  reason: string;
+}
+
+export interface TraceEntry {
+  step: number;
+  fileName: string;
+  line: number;
+  func: string;
+  summary: string;
+  changes: string;
+}

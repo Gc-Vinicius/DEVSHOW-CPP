@@ -1395,3 +1395,223 @@ svg.ico-sm {
   color: var(--emerald);
   line-height: 1.4;
 }
+
+/* Entrega 3 — Debug Floating Bar, Memory SVG & Trace Table */
+.editor-region {
+  position: relative;
+}
+
+.rail-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+  display: none;
+}
+
+.rail-btn.has-badge .rail-dot {
+  display: block;
+}
+
+.debug-floating-bar {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: var(--shadow-md);
+}
+
+.debug-pill-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warning);
+  padding: 0 8px 0 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+  animation: pulseDot 1.3s infinite;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.mem-svg-box {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  overflow: hidden;
+}
+
+.scalar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scalar-box {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+}
+
+.scalar-addr {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.scalar-name {
+  font-size: 11px;
+  color: var(--syn-type);
+  font-weight: 700;
+}
+
+.scalar-val {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.array-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.arr-cell {
+  min-width: 34px;
+  padding: 4px 5px;
+  border-radius: 5px;
+  text-align: center;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.arr-cell .idx {
+  display: block;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.arr-cell.hi-ini {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+
+.arr-cell.hi-mid {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+  font-weight: 700;
+}
+
+.arr-cell.hi-fim {
+  border-color: var(--emerald);
+  background: var(--emerald-bg);
+}
+
+.watch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 3.5px 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border-radius: 4px;
+}
+
+.watch-row:hover {
+  background: var(--bg-hover);
+}
+
+.watch-name {
+  color: var(--syn-type);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watch-val {
+  color: var(--syn-num);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 145px;
+  text-align: right;
+}
+
+.eval-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.eval-result {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--emerald);
+  padding: 5px 7px;
+  border-radius: 4px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  word-break: break-all;
+}
+
+.trace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.trace-table th {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trace-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.trace-table tr.cur-step {
+  background: var(--warning-bg);
+}

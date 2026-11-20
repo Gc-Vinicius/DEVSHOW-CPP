@@ -3,28 +3,28 @@ import type { CompilerProfile, RoteiroLesson, TemplateSpec } from "../types";
 export const COMPILER_PROFILES: CompilerProfile[] = [
   {
     id: "c11-rel",
-    label: "gcc.exe · C11 64-bit (-Wall)",
+    label: "gcc C11 64-bit (-Wall)",
     compiler: "gcc",
     stdFlag: "-std=c11",
     flags: ["-std=c11", "-Wall", "-Wextra", "-O2", "-static-libgcc"],
   },
   {
     id: "c11-dbg",
-    label: "gcc.exe · C11 64-bit Debug (-g)",
+    label: "gcc C11 64-bit Debug (-g)",
     compiler: "gcc",
     stdFlag: "-std=c11",
     flags: ["-std=c11", "-Wall", "-Wextra", "-g", "-O0", "-static-libgcc"],
   },
   {
     id: "c99-strict",
-    label: "gcc.exe · C99 64-bit Estrito",
+    label: "gcc C99 64-bit estrito",
     compiler: "gcc",
     stdFlag: "-std=c99",
     flags: ["-std=c99", "-Wall", "-Wextra", "-pedantic", "-g", "-static-libgcc"],
   },
   {
     id: "cpp17-rel",
-    label: "g++.exe · C++17 64-bit (-Wall)",
+    label: "g++ C++17 64-bit (-Wall)",
     compiler: "g++",
     stdFlag: "-std=c++17",
     flags: ["-std=c++17", "-Wall", "-Wextra", "-O2", "-static-libgcc"],
@@ -34,9 +34,9 @@ export const COMPILER_PROFILES: CompilerProfile[] = [
 export const ROTEIRO_LESSONS: RoteiroLesson[] = [
   {
     fileName: "01_funcoes.c",
-    block: "Bloco 1 · Funções",
+    block: "Bloco 1: Funções",
     time: "00:00–00:20",
-    split: "15m PC · 5m Papel",
+    split: "15m PC / 5m papel",
     desc: "Retorno vs void e por que dobrar(int x) não altera x na main (passagem por valor).",
     paper: "No papel (5m): escrever int ehPar(int n) retornando 1 ou 0 e chamar na main.",
     code: `#include <stdio.h>
@@ -64,9 +64,9 @@ int main(void) {
   },
   {
     fileName: "02_matrizes.c",
-    block: "Bloco 2 · Matrizes",
+    block: "Bloco 2: Matrizes",
     time: "00:20–00:40",
-    split: "15m PC · 5m Papel",
+    split: "15m PC / 5m papel",
     desc: "Grade 3x3 com for duplo (linha i, coluna j), soma por linha e diagonal principal.",
     paper: "No papel (5m): for duplo numa 2x3 contando > 10 (cuidado pra não usar <=).",
     code: `#include <stdio.h>
@@ -97,9 +97,9 @@ int main(void) {
   },
   {
     fileName: "03_struct.c",
-    block: "Bloco 3 · Struct",
+    block: "Bloco 3: Struct",
     time: "00:40–01:00",
-    split: "15m PC · 5m Papel",
+    split: "15m PC / 5m papel",
     desc: "typedef struct Aluno, acesso com ponto (a.nota) e vetor de structs.",
     paper: "No papel (5m): struct Livro (titulo, paginas, preco) + conferir o ';' no fim!",
     code: `#include <stdio.h>
@@ -133,9 +133,9 @@ int main(void) {
   },
   {
     fileName: "04_ponteiros.c",
-    block: "Bloco 4 · Ponteiros + Referência",
+    block: "Bloco 4: Ponteiros e referência",
     time: "01:15–01:50",
-    split: "20m PC · 15m Papel",
+    split: "20m PC / 15m papel",
     desc: "Endereços (&x e %p), *p alterando x, troca(&x, &y) e seta a->nota em struct.",
     paper: "No papel (15m): teste de mesa com caixinhas (x, y, *p) chamando troca(&x, &y).",
     code: `#include <stdio.h>
@@ -177,9 +177,9 @@ int main(void) {
   },
   {
     fileName: "05_ordenacao.c",
-    block: "Bloco 5 · Ordenação",
+    block: "Bloco 5: Ordenação",
     time: "01:50–02:10",
-    split: "13m PC · 7m Papel",
+    split: "13m PC / 7m papel",
     desc: "Bubble Sort reutilizando troca(&v[j], &v[j+1]) com print a cada passada.",
     paper: "No papel (7m): 2 passadas em [8, 4, 6, 1] e por que o loop para em n - 1.",
     code: `#include <stdio.h>
@@ -210,9 +210,9 @@ int main(void) {
   },
   {
     fileName: "06_busca_binaria.c",
-    block: "Bloco 6 · Binary Search",
+    block: "Bloco 6: Busca binária",
     time: "02:10–02:30",
-    split: "10m PC · 10m Papel",
+    split: "10m PC / 10m papel",
     desc: "while (ini <= fim), meio = (ini + fim)/2, meio+1 / meio-1 e return -1.",
     paper: "No papel (10m): escrever buscaBinaria do zero pelo esqueleto (compilador humano).",
     code: `#include <stdio.h>
@@ -239,9 +239,9 @@ int main(void) {
   },
   {
     fileName: "07_desafio_integrado.c",
-    block: "Desafio Final · 6 Temas Juntos",
-    time: "Extra · 30m",
-    split: "Struct+Matriz+Ptr+Sort+BS",
+    block: "Desafio final: 6 temas juntos",
+    time: "Extra (30m)",
+    split: "Struct, matriz, ptr e busca",
     desc: "Sistema de turma: notas[4][3] -> a->media -> ordena por matricula -> busca binaria.",
     paper: "Simulado completo de prova: conecta todos os 6 blocos em um único programa C.",
     code: `#include <stdio.h>

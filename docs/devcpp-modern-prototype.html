@@ -1,0 +1,2163 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dev-C Next — IDE Moderna para Linguagem C (Redesign Dev-C++ 5.11)</title>
+<style>
+  :root {
+    --font-ui: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", Inter, sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    --editor-font-size: 14px;
+    --radius-sm: 5px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --header-h: 46px;
+    --rail-w: 46px;
+    --sidebar-w: 276px;
+    --drawer-h: 215px;
+    --status-h: 26px;
+    --transition: 140ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  html[data-theme="dark"] {
+    --bg-canvas: #0f1117;
+    --bg-surface: #161922;
+    --bg-surface-2: #1c202d;
+    --bg-elevated: #202536;
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --bg-active: rgba(59, 130, 246, 0.17);
+    --bg-line-active: rgba(59, 130, 246, 0.10);
+    --bg-line-debug: rgba(245, 158, 11, 0.18);
+    --bg-line-error: rgba(239, 68, 68, 0.18);
+    --border-subtle: #252b3d;
+    --border-strong: #36405c;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #636d7c;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-fg: #ffffff;
+    --emerald: #10b981;
+    --emerald-bg: rgba(16, 185, 129, 0.14);
+    --success: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.14);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.15);
+    --error: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.15);
+    --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.42);
+    /* Syntax C Dark (WCAG AAA) */
+    --syn-kw: #c084fc;
+    --syn-type: #38bdf8;
+    --syn-fn: #60a5fa;
+    --syn-str: #4ade80;
+    --syn-num: #fb923c;
+    --syn-pre: #f472b6;
+    --syn-ptr: #fbbf24;
+    --syn-com: #6e7681;
+  }
+
+  html[data-theme="light"] {
+    --bg-canvas: #ffffff;
+    --bg-surface: #f6f8fa;
+    --bg-surface-2: #eef1f6;
+    --bg-elevated: #ffffff;
+    --bg-hover: rgba(15, 23, 42, 0.06);
+    --bg-active: rgba(29, 78, 216, 0.11);
+    --bg-line-active: rgba(29, 78, 216, 0.07);
+    --bg-line-debug: rgba(217, 119, 6, 0.15);
+    --bg-line-error: rgba(220, 38, 38, 0.11);
+    --border-subtle: #dfe4ee;
+    --border-strong: #c4cddf;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #6b7280;
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
+    --accent-fg: #ffffff;
+    --emerald: #059669;
+    --emerald-bg: rgba(5, 150, 105, 0.12);
+    --success: #059669;
+    --success-bg: rgba(5, 150, 105, 0.12);
+    --warning: #d97706;
+    --warning-bg: rgba(217, 119, 6, 0.13);
+    --error: #dc2626;
+    --error-bg: rgba(220, 38, 38, 0.11);
+    --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.18);
+    --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
+    /* Syntax C Light (WCAG AAA) */
+    --syn-kw: #7c3aed;
+    --syn-type: #0284c7;
+    --syn-fn: #1d4ed8;
+    --syn-str: #047857;
+    --syn-num: #c2410c;
+    --syn-pre: #be185d;
+    --syn-ptr: #b45309;
+    --syn-com: #6b7280;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%; overflow: hidden;
+    font-family: var(--font-ui); font-size: 13px;
+    background: var(--bg-canvas); color: var(--text-primary);
+    user-select: none; -webkit-font-smoothing: antialiased;
+  }
+  button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: none; }
+
+  .ide-shell { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+  /* Unified Header Bar (46px) */
+  .header-bar {
+    height: var(--header-h); flex-shrink: 0;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px; gap: 10px;
+  }
+  .header-left, .header-center, .header-right {
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+  }
+  .brand-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 9px; border-radius: var(--radius-sm);
+    font-weight: 700; font-size: 13px; letter-spacing: -0.01em;
+    transition: background var(--transition);
+  }
+  .brand-pill:hover { background: var(--bg-hover); }
+  .brand-logo {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: linear-gradient(135deg, #1d4ed8, #059669);
+    display: grid; place-items: center; color: #fff;
+    font-weight: 800; font-size: 13px; font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+  .brand-badge {
+    font-size: 10px; font-weight: 700; padding: 1px 6px;
+    border-radius: 4px; background: var(--emerald-bg); color: var(--emerald);
+    letter-spacing: 0.03em;
+  }
+  .divider-v { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 2px; flex-shrink: 0; }
+  .project-crumb {
+    display: flex; align-items: center; gap: 5px;
+    color: var(--text-secondary); font-size: 12px; white-space: nowrap;
+  }
+  .project-crumb strong { color: var(--text-primary); font-weight: 600; }
+
+  .compiler-select-wrap {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg-surface-2); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm); padding: 0 8px; height: 30px;
+  }
+  .compiler-select-wrap:hover { border-color: var(--border-strong); }
+  .compiler-select {
+    background: transparent; border: none; outline: none;
+    font-size: 12px; font-weight: 500; color: var(--text-primary);
+    cursor: pointer; max-width: 205px;
+  }
+  .compiler-select option { background: var(--bg-elevated); color: var(--text-primary); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 30px; padding: 0 10px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+    transition: background var(--transition), border-color var(--transition), transform 80ms;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-ghost { color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .btn-ghost.active { background: var(--bg-active); color: var(--accent-hover); }
+  .btn-subtle { background: var(--bg-surface-2); border: 1px solid var(--border-subtle); color: var(--text-primary); }
+  .btn-subtle:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+  .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-debug { background: var(--warning-bg); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.35); }
+  .btn-debug:hover { background: rgba(245, 158, 11, 0.24); }
+  .btn-emerald { background: var(--emerald-bg); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+  .btn-emerald:hover { background: rgba(16, 185, 129, 0.22); }
+  .btn-icon { width: 30px; padding: 0; }
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; padding: 1px 4px;
+    border-radius: 3px; border: 1px solid var(--border-strong);
+    background: rgba(128, 128, 128, 0.12); color: var(--text-secondary);
+  }
+  .btn-primary .kbd { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.16); color: #fff; }
+  .cmd-trigger {
+    display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px;
+    border-radius: var(--radius-sm); background: var(--bg-surface-2);
+    border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 12px;
+  }
+  .cmd-trigger:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+  /* Workspace */
+  .workspace { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+
+  /* Activity Rail */
+  .activity-rail {
+    width: var(--rail-w); flex-shrink: 0;
+    background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 8px 0;
+  }
+  .rail-group { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .rail-btn {
+    width: 34px; height: 34px; border-radius: var(--radius-sm);
+    display: grid; place-items: center; color: var(--text-secondary); position: relative;
+    transition: background var(--transition), color var(--transition);
+  }
+  .rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .rail-btn.active { color: var(--accent-hover); background: var(--bg-active); }
+  .rail-btn.active::before {
+    content: ""; position: absolute; left: -6px; top: 7px; bottom: 7px;
+    width: 3px; border-radius: 0 3px 3px 0; background: var(--accent);
+  }
+  .rail-dot {
+    position: absolute; top: 6px; right: 6px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--warning); display: none;
+  }
+  .rail-btn.has-badge .rail-dot { display: block; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; min-width: 210px; max-width: 480px;
+  }
+  .sidebar.hidden { display: none; }
+  .sidebar-header {
+    height: 36px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-secondary);
+  }
+  .sidebar-body { flex: 1; overflow-y: auto; padding: 8px; }
+  .tree-section-title {
+    font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+    padding: 8px 6px 4px; display: flex; align-items: center; justify-content: space-between;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .tree-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 6px 8px; border-radius: var(--radius-sm);
+    color: var(--text-secondary); text-align: left; font-size: 12.5px;
+    transition: background var(--transition), color var(--transition);
+  }
+  .tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tree-item.active { background: var(--bg-active); color: var(--text-primary); font-weight: 600; }
+  .tree-item .ext-badge {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    padding: 1px 5px; border-radius: 3px; background: var(--bg-surface-2); color: var(--text-muted);
+  }
+  .file-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-c { background: #38bdf8; }
+  .dot-h { background: #c084fc; }
+  .dot-star { background: #10b981; }
+
+  /* Memory / Pointer Visualizer & Debug Cards */
+  .debug-card {
+    background: var(--bg-surface-2); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md); padding: 9px; margin-bottom: 10px;
+  }
+  .debug-card-title {
+    font-size: 10.5px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 7px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .watch-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3.5px 5px; font-family: var(--font-mono); font-size: 11.5px; border-radius: 4px;
+  }
+  .watch-row:hover { background: var(--bg-hover); }
+  .watch-name { color: var(--syn-type); }
+  .watch-val { color: var(--syn-num); font-weight: 600; }
+  .watch-addr { color: var(--text-muted); font-size: 10.5px; }
+  .mem-svg-box {
+    background: var(--bg-canvas); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm); padding: 6px; overflow: hidden;
+  }
+  .array-strip {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
+  }
+  .arr-cell {
+    min-width: 34px; padding: 4px 5px; border-radius: 5px; text-align: center;
+    background: var(--bg-canvas); border: 1px solid var(--border-strong);
+    font-family: var(--font-mono); font-size: 11.5px;
+  }
+  .arr-cell .idx { display: block; font-size: 9px; color: var(--text-muted); }
+  .arr-cell.hi-ini { border-color: var(--accent); background: var(--bg-active); }
+  .arr-cell.hi-mid { border-color: var(--warning); background: var(--warning-bg); font-weight: 700; }
+  .arr-cell.hi-fim { border-color: var(--emerald); background: var(--emerald-bg); }
+
+  /* Trace Table (Teste de Mesa) */
+  .trace-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+  .trace-table th {
+    text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border-strong);
+    color: var(--text-secondary); font-weight: 600;
+  }
+  .trace-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); }
+  .trace-table tr.cur-step { background: var(--warning-bg); }
+
+  /* Splitters */
+  .splitter-v { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; }
+  .splitter-v:hover, .splitter-v.dragging { background: var(--accent); }
+  .splitter-h { height: 4px; cursor: row-resize; background: transparent; flex-shrink: 0; }
+  .splitter-h:hover, .splitter-h.dragging { background: var(--accent); }
+
+  /* Center Column */
+  .center-column { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .editor-region {
+    flex: 1; display: flex; flex-direction: column; min-height: 120px;
+    background: var(--bg-canvas); position: relative;
+  }
+
+  .tab-bar {
+    height: 36px; flex-shrink: 0; background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: stretch; justify-content: space-between;
+    padding-right: 8px; overflow-x: auto;
+  }
+  .tab-list { display: flex; align-items: stretch; }
+  .editor-tab {
+    display: flex; align-items: center; gap: 7px; padding: 0 12px;
+    font-size: 12.5px; color: var(--text-secondary);
+    border-right: 1px solid var(--border-subtle); position: relative; cursor: pointer; white-space: nowrap;
+  }
+  .editor-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .editor-tab.active { background: var(--bg-canvas); color: var(--text-primary); font-weight: 600; }
+  .editor-tab.active::after {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent);
+  }
+  .tab-close {
+    width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center;
+    opacity: 0.55; font-size: 13px;
+  }
+  .tab-close:hover { opacity: 1; background: var(--bg-hover); }
+  .tab-actions { display: flex; align-items: center; gap: 4px; }
+
+  /* Breadcrumb + Context Banner */
+  .breadcrumb-bar {
+    height: 28px; flex-shrink: 0; padding: 0 14px;
+    background: var(--bg-canvas); border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11.5px; color: var(--text-secondary); gap: 12px;
+  }
+  .breadcrumb-path { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+  .breadcrumb-sep { color: var(--text-muted); }
+  .breadcrumb-sym {
+    color: var(--syn-fn); font-family: var(--font-mono); font-size: 11.5px;
+    padding: 1px 6px; border-radius: 4px; cursor: pointer;
+  }
+  .breadcrumb-sym:hover { background: var(--bg-hover); }
+  .block-chip {
+    font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px;
+    background: var(--emerald-bg); color: var(--emerald); white-space: nowrap;
+  }
+
+  /* Code Panes */
+  .editor-split-wrap { flex: 1; display: flex; min-height: 0; overflow: hidden; position: relative; }
+  .code-pane {
+    flex: 1; overflow: auto; position: relative;
+    font-family: var(--font-mono); font-size: var(--editor-font-size);
+    line-height: 1.65; padding: 10px 0 42px; user-select: text;
+  }
+  .code-pane.secondary { border-left: 1px solid var(--border-subtle); display: none; }
+  .code-pane.secondary.open { display: block; }
+  .code-line { display: flex; align-items: stretch; min-height: 23px; padding-right: 16px; position: relative; }
+  .code-line:hover { background: rgba(128, 128, 128, 0.04); }
+  .code-line.active-line { background: var(--bg-line-active); }
+  .code-line.debug-line { background: var(--bg-line-debug); box-shadow: inset 3px 0 0 var(--warning); }
+  .code-line.error-line { background: var(--bg-line-error); box-shadow: inset 3px 0 0 var(--error); }
+  .gutter {
+    width: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 14px; gap: 6px; color: var(--text-muted); font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .gutter:hover .bp-slot { opacity: 0.45; }
+  .bp-slot { width: 9px; height: 9px; border-radius: 50%; background: var(--error); opacity: 0; }
+  .code-line.has-bp .bp-slot { opacity: 1; box-shadow: 0 0 0 2px rgba(239,68,68,0.28); }
+  .code-line.active-line .ln-num { color: var(--text-primary); font-weight: 600; }
+  .code-text { white-space: pre; flex: 1; tab-size: 4; }
+
+  .syn-kw { color: var(--syn-kw); font-weight: 600; }
+  .syn-type { color: var(--syn-type); }
+  .syn-fn { color: var(--syn-fn); }
+  .syn-str { color: var(--syn-str); }
+  .syn-num { color: var(--syn-num); }
+  .syn-pre { color: var(--syn-pre); }
+  .syn-ptr { color: var(--syn-ptr); font-weight: 700; }
+  .syn-com { color: var(--syn-com); font-style: italic; }
+
+  /* Floating Debug Bar */
+  .debug-floating-bar {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 25; display: none; align-items: center; gap: 4px;
+    padding: 5px 8px; border-radius: 10px;
+    background: var(--bg-elevated); border: 1px solid rgba(245, 158, 11, 0.45);
+    box-shadow: var(--shadow-md);
+  }
+  .debug-floating-bar.visible { display: flex; }
+  .debug-pill-label {
+    font-size: 11px; font-weight: 700; color: var(--warning);
+    padding: 0 8px 0 4px; display: flex; align-items: center; gap: 6px;
+  }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); animation: pulse 1.3s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Inline Find Widget */
+  .find-widget {
+    position: absolute; top: 10px; right: 16px; z-index: 22;
+    width: 340px; padding: 8px; border-radius: var(--radius-md);
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-md); display: none; flex-direction: column; gap: 6px;
+  }
+  .find-widget.open { display: flex; }
+  .find-row { display: flex; align-items: center; gap: 6px; }
+  .find-input {
+    flex: 1; height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
+    background: var(--bg-canvas); border: 1px solid var(--border-subtle); font-size: 12px; outline: none;
+  }
+  .find-input:focus { border-color: var(--accent); }
+  .find-count { font-size: 11px; color: var(--text-secondary); min-width: 56px; text-align: right; }
+
+  /* Thematic Autocomplete Popup */
+  .autocomplete-popup {
+    position: absolute; top: 180px; left: 205px; z-index: 24;
+    width: 350px; border-radius: var(--radius-md);
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-md); overflow: hidden; display: none;
+  }
+  .autocomplete-popup.open { display: block; }
+  .ac-header {
+    padding: 5px 10px; font-size: 10.5px; color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between;
+  }
+  .ac-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    font-family: var(--font-mono); font-size: 12px; cursor: pointer;
+  }
+  .ac-item:hover, .ac-item.selected { background: var(--bg-active); }
+  .ac-kind {
+    font-size: 10px; font-weight: 700; width: 20px; height: 18px;
+    border-radius: 4px; display: grid; place-items: center;
+    background: rgba(56, 189, 248, 0.16); color: var(--syn-type); flex-shrink: 0;
+  }
+  .ac-sig { margin-left: auto; font-size: 11px; color: var(--text-muted); font-family: var(--font-ui); }
+
+  /* Bottom Drawer */
+  .bottom-drawer {
+    height: var(--drawer-h); flex-shrink: 0; min-height: 115px; max-height: 55vh;
+    background: var(--bg-surface); border-top: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column;
+  }
+  .bottom-drawer.hidden { display: none; }
+  .drawer-header {
+    height: 34px; flex-shrink: 0; padding: 0 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-tabs { display: flex; align-items: center; gap: 4px; }
+  .drawer-tab {
+    height: 26px; padding: 0 10px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .drawer-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .drawer-tab.active { background: var(--bg-active); color: var(--accent-hover); }
+  .pill-count {
+    font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 99px;
+    background: var(--bg-surface-2); color: var(--text-secondary);
+  }
+  .pill-count.err { background: var(--error-bg); color: var(--error); }
+  .pill-count.warn { background: var(--warning-bg); color: var(--warning); }
+
+  .drawer-body {
+    flex: 1; overflow-y: auto; padding: 10px 14px;
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; user-select: text;
+  }
+  .diag-card {
+    padding: 8px 10px; border-radius: var(--radius-sm); margin-bottom: 6px;
+    background: var(--bg-surface-2); border: 1px solid var(--border-subtle);
+    cursor: pointer; font-family: var(--font-ui);
+  }
+  .diag-card:hover { border-color: var(--border-strong); }
+  .diag-top { display: flex; align-items: center; gap: 8px; }
+  .diag-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+  .diag-badge.err { background: var(--error-bg); color: var(--error); }
+  .diag-badge.warn { background: var(--warning-bg); color: var(--warning); }
+  .diag-hint { margin-top: 5px; font-size: 12px; color: var(--emerald); padding-left: 2px; }
+  .diag-loc { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-left: auto; }
+
+  .term-line { margin-bottom: 2px; }
+  .term-ok { color: var(--success); }
+  .term-warn { color: var(--warning); }
+  .term-err { color: var(--error); }
+  .term-muted { color: var(--text-secondary); }
+
+  /* Status Bar */
+  .status-bar {
+    height: var(--status-h); flex-shrink: 0;
+    background: var(--bg-surface); border-top: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; font-size: 11.5px; color: var(--text-secondary);
+  }
+  .status-group { display: flex; align-items: center; gap: 12px; }
+  .status-item { display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+  .status-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(5, 8, 15, 0.62); backdrop-filter: blur(4px);
+    display: none; align-items: flex-start; justify-content: center; padding-top: 64px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    width: 680px; max-width: calc(100vw - 32px); max-height: calc(100vh - 110px);
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-card.wide { width: 880px; }
+  .modal-card.palette { width: 560px; }
+  .modal-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .modal-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+  .modal-footer {
+    padding: 12px 18px; border-top: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  }
+
+  .palette-input-wrap { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 10px; }
+  .palette-input { flex: 1; background: transparent; border: none; outline: none; font-size: 14px; color: var(--text-primary); }
+  .palette-list { max-height: 340px; overflow-y: auto; padding: 6px; }
+  .palette-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .palette-item:hover, .palette-item.selected { background: var(--bg-active); }
+  .palette-cat { font-size: 10.5px; color: var(--text-muted); margin-right: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .tpl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .tpl-card {
+    padding: 11px; border-radius: var(--radius-md); text-align: left;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  }
+  .tpl-card:hover { border-color: var(--border-strong); }
+  .tpl-card.selected { border-color: var(--accent); background: var(--bg-active); }
+  .tpl-cat { font-size: 10px; text-transform: uppercase; color: var(--emerald); font-weight: 700; margin-bottom: 3px; }
+  .tpl-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .tpl-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
+  .tpl-preview {
+    background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+    padding: 12px; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; max-height: 170px; overflow: auto; white-space: pre;
+  }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .compare-box { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; background: var(--bg-surface); }
+  .compare-box.after { border-color: rgba(16, 185, 129, 0.55); }
+  .compare-box h3 { font-size: 13.5px; margin-bottom: 10px; }
+  .metric-list { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+  .metric-list li { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-subtle); }
+  .metric-val-bad { color: var(--error); font-weight: 600; }
+  .metric-val-good { color: var(--success); font-weight: 600; }
+
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); gap: 16px; }
+  .setting-label strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .setting-label span { font-size: 11.5px; color: var(--text-secondary); }
+  .setting-control select { height: 30px; padding: 0 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-strong); }
+
+  /* Roteiro Card in Sidebar */
+  .roteiro-item {
+    padding: 8px; border-radius: var(--radius-sm); background: var(--bg-surface-2);
+    border: 1px solid var(--border-subtle); margin-bottom: 7px; cursor: pointer;
+    transition: border-color var(--transition);
+  }
+  .roteiro-item:hover { border-color: var(--border-strong); }
+  .roteiro-item.active { border-color: var(--accent); background: var(--bg-active); }
+  .roteiro-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--emerald); margin-bottom: 3px; }
+  .roteiro-title { font-size: 12.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+  .roteiro-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
+  .paper-note {
+    margin-top: 6px; padding: 5px 7px; border-radius: 4px; font-size: 11px;
+    background: var(--emerald-bg); color: var(--emerald); line-height: 1.35;
+  }
+
+  .toast-stack { position: fixed; bottom: 38px; right: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast {
+    pointer-events: auto; padding: 10px 14px; border-radius: var(--radius-md);
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-md); font-size: 12.5px; animation: slideIn 180ms ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.ico { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  svg.ico-sm { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<div class="ide-shell">
+  <!-- UNIFIED COMPACT HEADER BAR (46px — C-FIRST) -->
+  <header class="header-bar">
+    <div class="header-left">
+      <button class="brand-pill" onclick="openModal('compareModal')" title="Comparativo Antes (Dev-C++ 5.11) vs. Depois (Dev-C Next)">
+        <span class="brand-logo">C</span>
+        <span>Dev-C</span>
+        <span class="brand-badge">C11 · NEXT</span>
+      </button>
+      <div class="divider-v"></div>
+      <div class="project-crumb">
+        <span>Roteiro_C_2Sem</span>
+        <span>/</span>
+        <strong id="headerFileName">04_ponteiros.c</strong>
+      </div>
+      <button class="btn btn-ghost" onclick="openModal('templateModal')" title="Novo Arquivo / Projeto C (Ctrl+Shift+N)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Templates C</span>
+      </button>
+    </div>
+
+    <!-- HERO GCC BUILD / RUN / DEBUG / ASTYLE CLUSTER -->
+    <div class="header-center">
+      <div class="compiler-select-wrap" title="gcc.exe local (TDM-GCC 4.9.2 do seu devcpp.ini)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        <select id="compilerSelect" class="compiler-select" onchange="onCompilerChange()">
+          <option value="0">gcc.exe · C11 64-bit (-Wall)</option>
+          <option value="1">gcc.exe · C11 64-bit Debug (-g)</option>
+          <option value="2">gcc.exe · C99 64-bit Estrito</option>
+          <option value="3">gcc.exe · C11 32-bit Release</option>
+          <option value="4">gcc.exe · C11 32-bit Debug (-g)</option>
+        </select>
+      </div>
+
+      <button class="btn btn-subtle" onclick="runBuild(false)" title="Compilar com gcc.exe (F9)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span>Compile</span>
+        <span class="kbd">F9</span>
+      </button>
+
+      <button class="btn btn-primary" onclick="runBuild(true)" title="Compilar e Executar em C (F11)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        <span>Compile &amp; Run</span>
+        <span class="kbd">F11</span>
+      </button>
+
+      <button class="btn btn-debug" id="btnDebugHeader" onclick="toggleDebugSession()" title="Depurar passo a passo + Visualizador de Memória/Ponteiros (F5)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M8 2l1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/></svg>
+        <span id="debugBtnLabel">Debug + Memória</span>
+        <span class="kbd">F5</span>
+      </button>
+
+      <button class="btn btn-subtle" onclick="formatWithAStyle()" title="Formatar código C com AStyle.exe (Ctrl+Shift+A)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M21 6H3M17 12H3M19 18H3"/></svg>
+        <span>AStyle</span>
+      </button>
+    </div>
+
+    <!-- UTILITIES -->
+    <div class="header-right">
+      <button class="cmd-trigger" onclick="openPalette()" title="Paleta de Comandos (Ctrl+K)">
+        <svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Comandos...</span>
+        <span class="kbd">Ctrl+K</span>
+      </button>
+      <button class="btn btn-ghost btn-icon" id="btnSplit" onclick="toggleSplit()" title="Editor Dividido (ex: ver .h e .c lado a lado)">
+        <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" onclick="openModal('compareModal')" title="Comparar Antes (5.11) vs. Depois">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3M21 3l-7.83 7.83"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" onclick="toggleTheme()" title="Alternar Tema Escuro / Claro">
+        <svg class="ico" id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" onclick="openModal('settingsModal')" title="Configurações & Atalhos">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+    <!-- ACTIVITY RAIL (46px) -->
+    <nav class="activity-rail" aria-label="Navegação Lateral">
+      <div class="rail-group">
+        <button class="rail-btn active" data-panel="roteiro" onclick="selectSidebar('roteiro')" title="Roteiro de Aula C (6 Blocos + Desafio Integrado)">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+        </button>
+        <button class="rail-btn" data-panel="files" onclick="selectSidebar('files')" title="Arquivos do Projeto (.c / .h)">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        </button>
+        <button class="rail-btn" data-panel="outline" onclick="selectSidebar('outline')" title="Funções e Structs do Arquivo Atual">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </button>
+        <button class="rail-btn" data-panel="search" onclick="selectSidebar('search')" title="Buscar em Todos os Arquivos .c (Ctrl+Shift+F)">
+          <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <button class="rail-btn" id="railDebugBtn" data-panel="debug" onclick="selectSidebar('debug')" title="Memória, Ponteiros & Teste de Mesa (GDB)">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="13" width="7" height="7" rx="1"/><path d="M10 7.5h4a2 2 0 0 1 2 2V13"/></svg>
+          <span class="rail-dot"></span>
+        </button>
+      </div>
+      <div class="rail-group">
+        <button class="rail-btn" onclick="toggleDrawer()" title="Alternar Painel Inferior (Ctrl+`)">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span id="sidebarTitle">Roteiro C · 2º Semestre</span>
+        <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;" onclick="toggleSidebar()" title="Recolher Barra Lateral">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="sidebar-body" id="sidebarBody"></div>
+    </aside>
+
+    <div class="splitter-v" id="splitterLeft" title="Arraste para redimensionar"></div>
+
+    <!-- CENTER COLUMN -->
+    <main class="center-column">
+      <section class="editor-region">
+        <!-- Single-Line Tabs -->
+        <div class="tab-bar">
+          <div class="tab-list" id="tabList"></div>
+          <div class="tab-actions">
+            <button class="btn btn-ghost" style="height:26px;font-size:11.5px;" onclick="toggleFindWidget()" title="Find / Replace inline (Ctrl+F)">
+              <svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <span>Find</span>
+            </button>
+            <button class="btn btn-ghost" style="height:26px;font-size:11.5px;" onclick="toggleAutocomplete()" title="Autocomplete C (Ctrl+Space)">
+              <span>Complete</span>
+            </button>
+            <button class="btn btn-ghost" style="height:26px;font-size:11.5px;" onclick="toggleDemoError()" id="btnDemoErr" title="Simular erros clássicos de prova em C com dica amigável">
+              <span style="color:var(--warning);">⚡ Simular Erro C</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Symbol Breadcrumb Strip -->
+        <div class="breadcrumb-bar">
+          <div class="breadcrumb-path">
+            <span id="crumbFile">04_ponteiros.c</span>
+            <span class="breadcrumb-sep">›</span>
+            <span class="breadcrumb-sym" id="crumbSymbol" onclick="selectSidebar('outline')">int main(void)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="block-chip" id="blockChip">Bloco 4 · Ponteiros + Referência (20m PC · 15m Papel)</span>
+          </div>
+        </div>
+
+        <!-- Floating Contextual Debug Bar -->
+        <div class="debug-floating-bar" id="debugFloatingBar">
+          <span class="debug-pill-label"><span class="pulse-dot"></span>GDB · TESTE DE MESA</span>
+          <button class="btn btn-ghost" style="height:26px;padding:0 8px;" onclick="debugStep('over')" title="Próxima Linha / Step Over (F7)">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>Next <span class="kbd">F7</span></span>
+          </button>
+          <button class="btn btn-ghost" style="height:26px;padding:0 8px;" onclick="debugStep('into')" title="Entrar na Função / Step Into (F8)">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+            <span>Into <span class="kbd">F8</span></span>
+          </button>
+          <button class="btn btn-ghost" style="height:26px;padding:0 8px;" onclick="debugStep('continue')" title="Avançar ao fim (F5)">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <span>Continue</span>
+          </button>
+          <button class="btn btn-ghost" style="height:26px;padding:0 8px;color:var(--error);" onclick="stopDebugSession()" title="Parar Depuração (F6)">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+            <span>Stop <span class="kbd">F6</span></span>
+          </button>
+        </div>
+
+        <!-- Inline Find & Replace Widget -->
+        <div class="find-widget" id="findWidget">
+          <div class="find-row">
+            <input class="find-input" id="findInput" placeholder="Localizar no arquivo .c..." oninput="renderEditor()" />
+            <span class="find-count" id="findCount">0 / 0</span>
+            <button class="btn btn-ghost btn-icon" style="height:26px;width:26px;" onclick="toggleFindWidget()">✕</button>
+          </div>
+          <div class="find-row">
+            <input class="find-input" id="replaceInput" placeholder="Substituir por..." />
+            <button class="btn btn-subtle" style="height:26px;padding:0 8px;" onclick="replaceInActiveFile()">Substituir</button>
+          </div>
+        </div>
+
+        <!-- Thematic C Autocomplete Popup -->
+        <div class="autocomplete-popup" id="acPopup">
+          <div class="ac-header">
+            <span>Code Completion C (Tema Nativo — sem popup branco!)</span>
+            <span>ESC</span>
+          </div>
+          <div class="ac-item selected" onclick="insertAc('printf(\"%p\\n\", (void*)p);')">
+            <span class="ac-kind">fn</span><span>printf</span><span class="ac-sig">&lt;stdio.h&gt;</span>
+          </div>
+          <div class="ac-item" onclick="insertAc('troca(&x, &y);')">
+            <span class="ac-kind">fn</span><span>troca(int *a, int *b)</span><span class="ac-sig">04_ponteiros.c</span>
+          </div>
+          <div class="ac-item" onclick="insertAc('a->nota += pts;')">
+            <span class="ac-kind">-&gt;</span><span>a-&gt;nota</span><span class="ac-sig">float (via Aluno *)</span>
+          </div>
+          <div class="ac-item" onclick="insertAc('buscaPorMatricula(turma, 4, mat)')">
+            <span class="ac-kind">fn</span><span>buscaPorMatricula</span><span class="ac-sig">07_desafio_integrado.c</span>
+          </div>
+        </div>
+
+        <!-- Editor Panes -->
+        <div class="editor-split-wrap">
+          <div class="code-pane" id="primaryEditor"></div>
+          <div class="code-pane secondary" id="secondaryEditor"></div>
+        </div>
+      </section>
+
+      <div class="splitter-h" id="splitterBottom" title="Arraste para redimensionar"></div>
+
+      <!-- BOTTOM DRAWER -->
+      <section class="bottom-drawer" id="bottomDrawer">
+        <div class="drawer-header">
+          <div class="drawer-tabs">
+            <button class="drawer-tab active" data-dtab="terminal" onclick="selectDrawerTab('terminal')">
+              <span>Terminal / Saída</span>
+            </button>
+            <button class="drawer-tab" data-dtab="problems" onclick="selectDrawerTab('problems')">
+              <span>Problemas GCC</span>
+              <span class="pill-count" id="problemsCount">0</span>
+            </button>
+            <button class="drawer-tab" data-dtab="trace" onclick="selectDrawerTab('trace')">
+              <span>Teste de Mesa (Trace)</span>
+            </button>
+            <button class="drawer-tab" data-dtab="log" onclick="selectDrawerTab('log')">
+              <span>Compile Log</span>
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary);cursor:pointer;">
+              <input type="checkbox" id="chkExternalPauser" />
+              <span>ConsolePauser.exe externo</span>
+            </label>
+            <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;" onclick="toggleDrawer()" title="Fechar painel (Ctrl+`)">✕</button>
+          </div>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- STATUS BAR (26px) -->
+  <footer class="status-bar">
+    <div class="status-group">
+      <span class="status-item" onclick="openModal('settingsModal')">
+        <span class="status-dot" id="statusBuildDot"></span>
+        <span id="statusCompiler">gcc.exe · C11 64-bit (-Wall)</span>
+      </span>
+      <span class="status-item" onclick="selectDrawerTab('problems', true)" id="statusDiag">0 erros · 0 avisos</span>
+    </div>
+    <div class="status-group">
+      <span class="status-item" id="statusCursor">Ln 16, Col 5</span>
+      <span class="status-item">C11 (ISO/IEC 9899)</span>
+      <span class="status-item">UTF-8</span>
+      <span class="status-item" id="statusAStyle" onclick="formatWithAStyle()">AStyle 2.03 (-A3 K&amp;R)</span>
+      <span class="status-item" id="statusKeymap" onclick="openModal('settingsModal')">Keymap: Híbrido</span>
+    </div>
+  </footer>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="modal-backdrop" id="paletteModal" onclick="backdropClose(event, 'paletteModal')">
+  <div class="modal-card palette">
+    <div class="palette-input-wrap">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input class="palette-input" id="paletteInput" placeholder="Buscar comando ou bloco C (ex: ponteiros, binary, compile, debug, astyle)..." oninput="renderPalette()" />
+      <span class="kbd">ESC</span>
+    </div>
+    <div class="palette-list" id="paletteList"></div>
+  </div>
+</div>
+
+<!-- TEMPLATES C MODAL -->
+<div class="modal-backdrop" id="templateModal" onclick="backdropClose(event, 'templateModal')">
+  <div class="modal-card wide">
+    <div class="modal-header">
+      <span class="modal-title">Novo Arquivo / Projeto em C (Templates Locais + Estruturas de Estudo)</span>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('templateModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tpl-grid" id="tplGrid"></div>
+      <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">Preview do código C:</div>
+      <pre class="tpl-preview" id="tplPreview"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-subtle" onclick="closeModal('templateModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="applySelectedTemplate()">Criar Arquivo .c</button>
+    </div>
+  </div>
+</div>
+
+<!-- BEFORE vs AFTER COMPARISON MODAL -->
+<div class="modal-backdrop" id="compareModal" onclick="backdropClose(event, 'compareModal')">
+  <div class="modal-card wide">
+    <div class="modal-header">
+      <span class="modal-title">Dev-C++ 5.11 (Atual) vs. Dev-C Next (Focado em Linguagem C)</span>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('compareModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="compare-grid">
+        <div class="compare-box">
+          <h3>🏛️ Antes — Dev-C++ 5.11 (Evidências PE/DFM)</h3>
+          <ul class="metric-list">
+            <li><span>Foco padrão no devcpp.ini</span><span class="metric-val-bad">DefCpp=1 (força C++ / g++)</span></li>
+            <li><span>Toolbars &amp; Menus</span><span class="metric-val-bad">8 toolbars · 27 botões · 152 itens menu</span></li>
+            <li><span>Tema Escuro &amp; DPI</span><span class="metric-val-bad">Moldura clBtnFace · sem dpiAwareness</span></li>
+            <li><span>Depuração de Ponteiros</span><span class="metric-val-bad">13 controles espremidos + texto GDB cru</span></li>
+            <li><span>Erros de GCC para iniciantes</span><span class="metric-val-bad">Linha seca no TListView sem contexto</span></li>
+            <li><span>Painel Inferior</span><span class="metric-val-bad">Aba falsa "Close" + CMD externo</span></li>
+          </ul>
+        </div>
+        <div class="compare-box after">
+          <h3>✨ Depois — Dev-C Next (Edição C11)</h3>
+          <ul class="metric-list">
+            <li><span>Foco C-First nativo</span><span class="metric-val-good">gcc.exe -std=c11 -Wall · arquivos .c</span></li>
+            <li><span>Header &amp; Navegação</span><span class="metric-val-good">1 barra (46px) + Command Palette (Ctrl+K)</span></li>
+            <li><span>Tema Dark / Light &amp; DPI</span><span class="metric-val-good">100% vetorial SVG + contraste WCAG AAA</span></li>
+            <li><span>Visualizador de Memória</span><span class="metric-val-good">Caixinhas SVG (0x100 → *p) + Teste de Mesa</span></li>
+            <li><span>Diagnósticos GCC Amigáveis</span><span class="metric-val-good">Erro real + dica de C (;, &amp;, -&gt;, &lt;=)</span></li>
+            <li><span>Terminal Integrado</span><span class="metric-val-good">Saída na mesma tela + ConsolePauser opcional</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('compareModal')">Voltar à IDE</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-backdrop" id="settingsModal" onclick="backdropClose(event, 'settingsModal')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-title">Configurações Rápidas (C11 · GCC · AStyle · Atalhos)</span>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('settingsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-row">
+        <div class="setting-label">
+          <strong>Tema da Interface</strong>
+          <span>Obsidian Slate (Dark) ou Daylight Paper (inspirado no seu roteiro de aula).</span>
+        </div>
+        <div class="setting-control">
+          <select id="setTheme" onchange="setTheme(this.value)">
+            <option value="dark">Obsidian Slate (Dark)</option>
+            <option value="light">Daylight Paper (Light)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <strong>Fonte do Editor C</strong>
+          <span>Destaca claramente *p, &amp;x, -&gt;, ; e chaves {}.</span>
+        </div>
+        <div class="setting-control">
+          <select id="setFont" onchange="applyEditorFont()">
+            <option value='"JetBrains Mono", "Cascadia Code", Consolas, monospace'>JetBrains Mono / Cascadia</option>
+            <option value='"Cascadia Code", Consolas, monospace'>Cascadia Code</option>
+            <option value='Consolas, monospace'>Consolas (Nativa Windows)</option>
+            <option value='"Courier New", monospace'>Courier New (Legado 5.11)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <strong>Tamanho da Fonte</strong>
+          <span>Ideal para projetar ou estudar lado a lado no notebook.</span>
+        </div>
+        <div class="setting-control">
+          <select id="setFontSize" onchange="applyEditorFont()">
+            <option value="13px">13 px</option>
+            <option value="14px" selected>14 px (Padrão)</option>
+            <option value="16px">16 px (Modo Aula / Projetor)</option>
+            <option value="18px">18 px (Grande)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <strong>Estilo AStyle.exe (Linguagem C)</strong>
+          <span>Invoca C:\Program Files (x86)\Dev-Cpp\AStyle\AStyle.exe.</span>
+        </div>
+        <div class="setting-control">
+          <select id="setAStyle" onchange="updateAStyleStatus()">
+            <option value="-A3" selected>K&amp;R (-A3 — clássico C)</option>
+            <option value="-A2">Java / Attached (-A2 — seu devcpp.ini)</option>
+            <option value="-A1">Allman / BSD (-A1 — chaves em nova linha)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row" style="border-bottom:none;">
+        <div class="setting-label">
+          <strong>Perfil de Atalhos</strong>
+          <span>Preserva F9/F11/F5 do Dev-C++ com ergonomia moderna.</span>
+        </div>
+        <div class="setting-control">
+          <select id="setKeymap" onchange="updateKeymap()">
+            <option value="hybrid">Híbrido (F9/F11 + Ctrl+H Replace + Ctrl+K)</option>
+            <option value="classic">Dev-C++ 5.11 Clássico</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('settingsModal')">Concluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+// ===================== C-FIRST FILES (MAPPED TO USER'S LESSON PLAN) =====================
+const ROTEIRO_META = {
+  '01_funcoes.c': {
+    block: 'Bloco 1 · Funções', time: '00:00–00:20', split: '15m PC · 5m Papel',
+    desc: 'Retorno vs void e por que dobrar(int x) não muda x na main (passagem por valor).',
+    paper: 'No papel (5m): escrever int ehPar(int n) retornando 1 ou 0 e chamar na main.',
+    output: [
+      'Media das notas: 8.25',
+      'Antes de dobrar(x): x = 10',
+      'Dentro de dobrar: x copia = 20',
+      'Depois de dobrar(x): x ainda eh 10 (passagem por valor!)'
+    ]
+  },
+  '02_matrizes.c': {
+    block: 'Bloco 2 · Matrizes', time: '00:20–00:40', split: '15m PC · 5m Papel',
+    desc: 'Grade 3x3 com for duplo (linha i, coluna j), soma por linha e diagonal principal.',
+    paper: 'No papel (5m): for duplo numa 2x3 contando > 10 (cuidado pra não usar <=).',
+    output: [
+      'Linha 0 -> soma = 15',
+      'Linha 1 -> soma = 24',
+      'Linha 2 -> soma = 18',
+      'Diagonal principal: m[0][0]=2  m[1][1]=8  m[2][2]=6'
+    ]
+  },
+  '03_struct.c': {
+    block: 'Bloco 3 · Struct', time: '00:40–01:00', split: '15m PC · 5m Papel',
+    desc: 'typedef struct Aluno, acesso com ponto (a.nota) e vetor de structs.',
+    paper: 'No papel (5m): struct Livro (titulo, paginas, preco) + conferir o ";" no fim!',
+    output: [
+      'Turma cadastrada: 3 alunos',
+      'Maior nota: Clara (9.4)'
+    ]
+  },
+  '04_ponteiros.c': {
+    block: 'Bloco 4 · Ponteiros + Referência', time: '01:15–01:50', split: '20m PC · 15m Papel',
+    desc: 'Endereços (&x e %p), *p alterando x, troca(&x, &y) e seta a->nota em struct.',
+    paper: 'No papel (15m): teste de mesa com caixinhas (x, y, *p) chamando troca(&x, &y).',
+    output: [
+      'Endereco &x = 0x00100 | p guarda = 0x00100 | *p = 10',
+      'Apos *p = 25 -> x agora vale 25',
+      'Antes da troca: x = 25, y = 40',
+      'Depois da troca: x = 40, y = 25',
+      'Aluno Ana -> nota com bonus: 8.5'
+    ]
+  },
+  '05_ordenacao.c': {
+    block: 'Bloco 5 · Ordenação', time: '01:50–02:10', split: '13m PC · 7m Papel',
+    desc: 'Bubble Sort reutilizando troca(&v[j], &v[j+1]) com print a cada passada.',
+    paper: 'No papel (7m): 2 passadas em [8, 4, 6, 1] e por que o loop para em n - 1.',
+    output: [
+      'Vetor inicial:  [7, 3, 9, 2, 5]',
+      'Passada 1:      [3, 7, 2, 5, 9]',
+      'Passada 2:      [3, 2, 5, 7, 9]',
+      'Passada 3:      [2, 3, 5, 7, 9]',
+      'Vetor ordenado: [2, 3, 5, 7, 9]'
+    ]
+  },
+  '06_busca_binaria.c': {
+    block: 'Bloco 6 · Binary Search', time: '02:10–02:30', split: '10m PC · 10m Papel',
+    desc: 'while (ini <= fim), meio = (ini + fim)/2, meio+1 / meio-1 e return -1.',
+    paper: 'No papel (10m): escrever buscaBinaria do zero pelo esqueleto (compilador humano).',
+    output: [
+      'Buscando 28 em [3, 7, 11, 19, 28, 42, 56, 70]:',
+      '  volta 1: ini=0 meio=3 (v[3]=19) fim=7 -> vai pra direita',
+      '  volta 2: ini=4 meio=5 (v[5]=42) fim=7 -> vai pra esquerda',
+      '  volta 3: ini=4 meio=4 (v[4]=28) fim=4 -> ACHOU no indice 4!',
+      'Buscando 99 -> retornou -1 (nao encontrado)'
+    ]
+  },
+  '07_desafio_integrado.c': {
+    block: 'Desafio Final · 6 Temas Juntos', time: 'Extra · 30m', split: 'Struct+Matriz+Ptr+Sort+BS',
+    desc: 'Sistema de turma: notas[4][3] -> a->media -> ordena por matricula -> busca binaria.',
+    paper: 'Simulado completo de prova: conecta todos os 6 blocos em um único programa C.',
+    output: [
+      'Medias gravadas via ponteiro (a->media) e turma ordenada por matricula:',
+      '  Mat 102 -> media 8.50',
+      '  Mat 105 -> media 7.20',
+      '  Mat 109 -> media 9.10',
+      '  Mat 114 -> media 6.80',
+      'Busca binaria matricula 109 -> encontrada no indice 2 (media 9.10)'
+    ]
+  }
+};
+
+const FILES = {
+  '01_funcoes.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+float calcularMedia(float n1, float n2) {
+    return (n1 + n2) / 2.0f;
+}
+
+void dobrar(int x) {
+    x = x * 2;
+    printf("Dentro de dobrar: x copia = %d\\n", x);
+}
+
+int main(void) {
+    float media = calcularMedia(7.5f, 9.0f);
+    printf("Media das notas: %.2f\\n", media);
+
+    int x = 10;
+    printf("Antes de dobrar(x): x = %d\\n", x);
+    dobrar(x);
+    printf("Depois de dobrar(x): x ainda eh %d (passagem por valor!)\\n", x);
+    return 0;
+}`
+  },
+  '02_matrizes.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+int main(void) {
+    int m[3][3] = {
+        { 2, 5, 8 },
+        { 9, 8, 7 },
+        { 4, 8, 6 }
+    };
+
+    for (int i = 0; i < 3; i++) {
+        int soma = 0;
+        for (int j = 0; j < 3; j++) {
+            soma += m[i][j];
+        }
+        printf("Linha %d -> soma = %d\\n", i, soma);
+    }
+
+    printf("Diagonal principal: ");
+    for (int i = 0; i < 3; i++) {
+        printf("m[%d][%d]=%d  ", i, i, m[i][i]);
+    }
+    printf("\\n");
+    return 0;
+}`
+  },
+  '03_struct.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+typedef struct {
+    char nome[30];
+    float nota;
+} Aluno;
+
+void imprimirMelhorAluno(Aluno turma[], int n) {
+    int idx = 0;
+    for (int i = 1; i < n; i++) {
+        if (turma[i].nota > turma[idx].nota) {
+            idx = i;
+        }
+    }
+    printf("Maior nota: %s (%.1f)\\n", turma[idx].nome, turma[idx].nota);
+}
+
+int main(void) {
+    Aluno turma[3] = {
+        { "Lucas", 7.8f },
+        { "Clara", 9.4f },
+        { "Pedro", 8.1f }
+    };
+    printf("Turma cadastrada: 3 alunos\\n");
+    imprimirMelhorAluno(turma, 3);
+    return 0;
+}`
+  },
+  '04_ponteiros.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+typedef struct {
+    char nome[30];
+    float nota;
+} Aluno;
+
+void troca(int *a, int *b) {
+    int aux = *a;
+    *a = *b;
+    *b = aux;
+}
+
+void darBonus(Aluno *a, float pts) {
+    a->nota += pts;
+}
+
+int main(void) {
+    int x = 10;
+    int y = 40;
+    int *p = &x;
+
+    printf("Endereco &x = %p | p guarda = %p | *p = %d\\n", (void*)&x, (void*)p, *p);
+    *p = 25;
+    printf("Apos *p = 25 -> x agora vale %d\\n", x);
+
+    printf("Antes da troca: x = %d, y = %d\\n", x, y);
+    troca(&x, &y);
+    printf("Depois da troca: x = %d, y = %d\\n", x, y);
+
+    Aluno ana = { "Ana", 7.5f };
+    darBonus(&ana, 1.0f);
+    printf("Aluno %s -> nota com bonus: %.1f\\n", ana.nome, ana.nota);
+    return 0;
+}`,
+    messy: `#include <stdio.h>
+typedef struct{char nome[30];float nota;}Aluno;
+void troca(int *a,int *b){
+int aux=*a;
+*a=*b;
+*b=aux;
+}
+void darBonus(Aluno *a,float pts){
+a->nota+=pts;
+}
+int main(void){
+int x=10,y=40;
+int *p=&x;
+*p=25;
+troca(&x,&y);
+return 0;
+}`
+  },
+  '05_ordenacao.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+void troca(int *a, int *b) {
+    int aux = *a;
+    *a = *b;
+    *b = aux;
+}
+
+void ordenar(int v[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - 1 - i; j++) {
+            if (v[j] > v[j + 1]) {
+                troca(&v[j], &v[j + 1]);
+            }
+        }
+        printf("Passada %d: [%d, %d, %d, %d, %d]\\n", i + 1, v[0], v[1], v[2], v[3], v[4]);
+    }
+}
+
+int main(void) {
+    int v[5] = { 7, 3, 9, 2, 5 };
+    ordenar(v, 5);
+    return 0;
+}`
+  },
+  '06_busca_binaria.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+int buscaBinaria(int v[], int n, int alvo) {
+    int ini = 0, fim = n - 1;
+    while (ini <= fim) {
+        int meio = (ini + fim) / 2;
+        printf("  ini=%d meio=%d (v[meio]=%d) fim=%d\\n", ini, meio, v[meio], fim);
+        if (v[meio] == alvo) return meio;
+        if (v[meio] < alvo)  ini = meio + 1;
+        else                 fim = meio - 1;
+    }
+    return -1;
+}
+
+int main(void) {
+    int v[8] = { 3, 7, 11, 19, 28, 42, 56, 70 };
+    int pos = buscaBinaria(v, 8, 28);
+    printf("Indice encontrado: %d\\n", pos);
+    return 0;
+}`
+  },
+  '07_desafio_integrado.c': {
+    ext: 'c',
+    content: `#include <stdio.h>
+
+typedef struct {
+    int matricula;
+    float media;
+} Aluno;
+
+void calcularMediaAluno(Aluno *a, float notas[3]) {
+    float soma = 0.0f;
+    for (int j = 0; j < 3; j++) soma += notas[j];
+    a->media = soma / 3.0f;
+}
+
+void trocaAluno(Aluno *a, Aluno *b) {
+    Aluno aux = *a;
+    *a = *b;
+    *b = aux;
+}
+
+void ordenarPorMatricula(Aluno v[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - 1 - i; j++) {
+            if (v[j].matricula > v[j + 1].matricula) {
+                trocaAluno(&v[j], &v[j + 1]);
+            }
+        }
+    }
+}
+
+int buscaPorMatricula(Aluno v[], int n, int mat) {
+    int ini = 0, fim = n - 1;
+    while (ini <= fim) {
+        int meio = (ini + fim) / 2;
+        if (v[meio].matricula == mat) return meio;
+        if (v[meio].matricula < mat)  ini = meio + 1;
+        else                          fim = meio - 1;
+    }
+    return -1;
+}
+
+int main(void) {
+    float notas[4][3] = {
+        { 9.0f, 8.5f, 9.8f },
+        { 7.0f, 7.6f, 7.0f },
+        { 8.5f, 8.5f, 8.5f },
+        { 6.5f, 7.0f, 6.9f }
+    };
+    Aluno turma[4] = { {109, 0}, {105, 0}, {102, 0}, {114, 0} };
+
+    for (int i = 0; i < 4; i++) calcularMediaAluno(&turma[i], notas[i]);
+    ordenarPorMatricula(turma, 4);
+
+    int idx = buscaPorMatricula(turma, 4, 109);
+    if (idx != -1) {
+        printf("Mat %d encontrada no indice %d -> media %.2f\\n",
+               turma[idx].matricula, idx, turma[idx].media);
+    }
+    return 0;
+}`
+  }
+};
+
+const TEMPLATES = [
+  {
+    id: '2-ConsoleApp-C', cat: 'Básico C', name: 'Aplicação Console em C',
+    desc: 'Template oficial ConsoleApp_c.txt do Dev-C++ limpo para C11.',
+    file: 'novo_console.c',
+    code: `#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    printf("Ola, mundo em C11!\\n");\n    return 0;\n}`
+  },
+  {
+    id: 'Ptr-Struct-C', cat: '2º Semestre', name: 'Struct + Ponteiro (a->campo)',
+    desc: 'Esqueleto pronto para praticar typedef struct e passagem por referência.',
+    file: 'exercicio_struct_ptr.c',
+    code: `#include <stdio.h>\n\ntypedef struct {\n    char titulo[40];\n    int paginas;\n    float preco;\n} Livro;\n\nvoid aplicarDesconto(Livro *l, float pct) {\n    l->preco -= l->preco * pct;\n}\n\nint main(void) {\n    Livro l = { "Linguagem C", 320, 80.0f };\n    aplicarDesconto(&l, 0.15f);\n    printf("%s -> R$ %.2f\\n", l.titulo, l.preco);\n    return 0;\n}`
+  },
+  {
+    id: 'Matrix-C', cat: '2º Semestre', name: 'Matriz 2D (Linha × Coluna)',
+    desc: 'Base limpa para varredura de matrizes int m[L][C] com for duplo.',
+    file: 'exercicio_matriz.c',
+    code: `#include <stdio.h>\n\n#define LIN 2\n#define COL 3\n\nint main(void) {\n    int m[LIN][COL] = { {4, 12, 9}, {15, 3, 22} };\n    int maiores = 0;\n    for (int i = 0; i < LIN; i++) {\n        for (int j = 0; j < COL; j++) {\n            if (m[i][j] > 10) maiores++;\n        }\n    }\n    printf("Maiores que 10: %d\\n", maiores);\n    return 0;\n}`
+  },
+  {
+    id: 'BinarySearch-C', cat: 'Algoritmos', name: 'Busca Binária + Swap',
+    desc: 'Esqueleto completo para treinar buscaBinaria e ordenação em C.',
+    file: 'exercicio_busca.c',
+    code: `#include <stdio.h>\n\nint buscaBinaria(int v[], int n, int alvo) {\n    int ini = 0, fim = n - 1;\n    while (ini <= fim) {\n        int meio = (ini + fim) / 2;\n        if (v[meio] == alvo) return meio;\n        if (v[meio] < alvo)  ini = meio + 1;\n        else                 fim = meio - 1;\n    }\n    return -1;\n}\n\nint main(void) {\n    int v[6] = { 2, 5, 9, 14, 21, 30 };\n    printf("Posicao do 14: %d\\n", buscaBinaria(v, 6, 14));\n    return 0;\n}`
+  },
+  {
+    id: 'Dynamic-Mem-C', cat: 'Memória', name: 'Alocação Dinâmica (malloc/free)',
+    desc: 'Vetor dinâmico seguro com verificação de NULL e liberação com free().',
+    file: 'vetor_dinamico.c',
+    code: `#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int n = 5;\n    int *v = (int *)malloc(n * sizeof(int));\n    if (!v) return 1;\n    for (int i = 0; i < n; i++) v[i] = (i + 1) * 10;\n    for (int i = 0; i < n; i++) printf("%d ", v[i]);\n    printf("\\n");\n    free(v);\n    return 0;\n}`
+  },
+  {
+    id: 'StaticLib-C', cat: 'Modularização', name: 'Módulo C (.h + .c)',
+    desc: 'Template de biblioteca estática C separando interface e implementação.',
+    file: 'utils_c.h',
+    code: `#ifndef UTILS_C_H\n#define UTILS_C_H\n\nvoid troca_int(int *a, int *b);\nint eh_par(int n);\n\n#endif`
+  }
+];
+
+const COMPILER_SETS = [
+  'gcc.exe · C11 64-bit (-Wall)',
+  'gcc.exe · C11 64-bit Debug (-g)',
+  'gcc.exe · C99 64-bit Estrito',
+  'gcc.exe · C11 32-bit Release',
+  'gcc.exe · C11 32-bit Debug (-g)'
+];
+
+// Interactive Memory/Pointer + Binary Search Debug Traces!
+const DEBUG_SCENARIOS = {
+  '04_ponteiros.c': [
+    {
+      line: 21, fn: 'main()', note: 'int *p = &x guarda o endereço 0x100 na caixinha de p',
+      mem: { mode: 'ptr', x: 10, y: 40, pAddr: '0x100', target: 'x', expr: '*p acessa o valor 10 em x' },
+      locals: { x: '10 (0x100)', y: '40 (0x104)', p: '0x100 -> x', '*p': '10' }
+    },
+    {
+      line: 24, fn: 'main()', note: '*p = 25 abre o endereço 0x100 e modifica x diretamente!',
+      mem: { mode: 'ptr', x: 25, y: 40, pAddr: '0x100', target: 'x', expr: '*p = 25 mudou x de 10 para 25!' },
+      locals: { x: '25 (0x100)', y: '40 (0x104)', p: '0x100 -> x', '*p': '25' }
+    },
+    {
+      line: 9, fn: 'troca(a=0x100, b=0x104)', note: 'aux = *a (25), depois *a = *b (40) e *b = aux (25)',
+      mem: { mode: 'swap', x: 40, y: 25, aux: 25, expr: 'troca(&x, &y) inverteu x e y na memória real' },
+      locals: { '*a (x)': '40', '*b (y)': '25', aux: '25' }
+    },
+    {
+      line: 15, fn: 'darBonus(a=&ana, pts=1.0)', note: 'a->nota += 1.0 altera ana.nota de 7.5 para 8.5',
+      mem: { mode: 'struct', nome: 'Ana', nota: '8.5', expr: 'a->nota equivale a (*a).nota' },
+      locals: { 'a': '0x120 -> ana', 'a->nome': '"Ana"', 'a->nota': '7.5 -> 8.5' }
+    }
+  ],
+  '06_busca_binaria.c': [
+    {
+      line: 6, fn: 'buscaBinaria(alvo=28)', note: 'Volta 1: v[3]=19 < 28 → descarta metade esquerda (ini = meio + 1)',
+      mem: { mode: 'bs', arr: [3,7,11,19,28,42,56,70], ini: 0, mid: 3, fim: 7, expr: 'v[3]=19 < 28 → ini = 4' },
+      locals: { ini: '0', meio: '3', fim: '7', 'v[meio]': '19', alvo: '28' }
+    },
+    {
+      line: 6, fn: 'buscaBinaria(alvo=28)', note: 'Volta 2: v[5]=42 > 28 → descarta metade direita (fim = meio - 1)',
+      mem: { mode: 'bs', arr: [3,7,11,19,28,42,56,70], ini: 4, mid: 5, fim: 7, expr: 'v[5]=42 > 28 → fim = 4' },
+      locals: { ini: '4', meio: '5', fim: '7', 'v[meio]': '42', alvo: '28' }
+    },
+    {
+      line: 8, fn: 'buscaBinaria(alvo=28)', note: 'Volta 3: ini==4, meio==4, fim==4 → v[4] == 28! Retorna índice 4.',
+      mem: { mode: 'bs', arr: [3,7,11,19,28,42,56,70], ini: 4, mid: 4, fim: 4, expr: 'ACHOU! return 4 (while ini <= fim)' },
+      locals: { ini: '4', meio: '4', fim: '4', 'v[meio]': '28 (MATCH)', return: '4' }
+    }
+  ]
+};
+
+// ===================== APP STATE =====================
+const state = {
+  openTabs: ['04_ponteiros.c', '06_busca_binaria.c', '07_desafio_integrado.c'],
+  activeFile: '04_ponteiros.c',
+  splitOpen: false,
+  activeLine: 21,
+  sidebarPanel: 'roteiro',
+  sidebarOpen: true,
+  drawerOpen: true,
+  drawerTab: 'terminal',
+  breakpoints: { '04_ponteiros.c': new Set([21, 28]), '06_busca_binaria.c': new Set([6]) },
+  demoError: false,
+  debugActive: false,
+  debugFile: '04_ponteiros.c',
+  debugStepIdx: 0,
+  traceHistory: [],
+  selectedTemplate: 0,
+  searchQuery: '',
+  terminalLines: [
+    { cls: 'term-muted', text: 'Dev-C Next (Edição C11) · Compilador local: C:\\Program Files (x86)\\Dev-Cpp\\MinGW64\\bin\\gcc.exe' },
+    { cls: 'term-muted', text: 'Roteiro carregado (6 blocos + Desafio Integrado). Pressione F11 para rodar ou F5 para ver Ponteiros/Memória ao vivo!' }
+  ],
+  compileLog: [
+    'Pronto: gcc.exe (tdm64-1 4.9.2) · Flags: -std=c11 -Wall -Wextra -static-libgcc'
+  ],
+  problems: []
+};
+
+// ===================== C SYNTAX HIGHLIGHTER =====================
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlightCLine(raw, query = '') {
+  const esc = escapeHtml(raw);
+  const comIdx = esc.indexOf('//');
+  let codePart = comIdx >= 0 ? esc.slice(0, comIdx) : esc;
+  let comPart = comIdx >= 0 ? `<span class="syn-com">${esc.slice(comIdx)}</span>` : '';
+
+  if (/^\s*#/.test(codePart)) {
+    codePart = codePart.replace(/^(\s*#\w+)(.*)$/, (_, d, rest) => {
+      const r = rest.replace(/(&lt;[^&]+&gt;|"[^"]*")/g, '<span class="syn-str">$1</span>');
+      return `<span class="syn-pre">${d}</span>${r}`;
+    });
+  } else {
+    const strs = [];
+    codePart = codePart.replace(/"(?:\\.|[^"\\])*"/g, m => {
+      strs.push(`<span class="syn-str">${m}</span>`);
+      return `\x00S${strs.length - 1}\x00`;
+    });
+    codePart = codePart
+      .replace(/(-&gt;)/g, '<span class="syn-ptr">$1</span>')
+      .replace(/\b(int|float|double|char|void|const|return|if|else|for|while|do|switch|case|break|struct|typedef|sizeof|static|NULL)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/\b(Aluno|Livro|FILE|size_t)\b/g, '<span class="syn-type">$1</span>')
+      .replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, '<span class="syn-fn">$1</span>')
+      .replace(/\b(\d+(?:\.\d+)?f?)\b/g, '<span class="syn-num">$1</span>');
+    codePart = codePart.replace(/\x00S(\d+)\x00/g, (_, idx) => strs[Number(idx)]);
+  }
+
+  let out = codePart + comPart;
+  if (query && query.length > 0) {
+    const safeQ = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`(${safeQ})(?![^<]*>)`, 'gi'), '<mark style="background:rgba(245,158,11,0.42);color:inherit;border-radius:2px;padding:0 1px;">$1</mark>');
+  }
+  return out || ' ';
+}
+
+// ===================== MEMORY / POINTER SVG RENDERER =====================
+function renderMemoryVisual(step) {
+  if (!step || !step.mem) {
+    return `<div style="font-size:11.5px;color:var(--text-muted);line-height:1.45;">
+      Pressione <strong>F5 (Debug + Memória)</strong> em <code>04_ponteiros.c</code> ou <code>06_busca_binaria.c</code> para ver as <strong>caixinhas de endereço/ponteiro</strong> e o <strong>Teste de Mesa</strong> se atualizando passo a passo!
+    </div>`;
+  }
+  const m = step.mem;
+  if (m.mode === 'ptr') {
+    return `<div class="mem-svg-box">
+      <svg viewBox="0 0 260 116" width="100%">
+        <defs><marker id="pArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="#3b82f6"/></marker></defs>
+        <text x="52" y="14" text-anchor="middle" font-size="9.5" fill="var(--text-muted)" font-family="monospace">end. 0x100</text>
+        <rect x="12" y="20" width="80" height="54" rx="5" fill="var(--bg-surface)" stroke="var(--emerald)" stroke-width="1.8"/>
+        <text x="52" y="37" text-anchor="middle" font-size="10.5" fill="var(--emerald)" font-family="monospace" font-weight="700">int x</text>
+        <text x="52" y="62" text-anchor="middle" font-size="20" fill="var(--text-primary)" font-family="monospace" font-weight="700">${m.x}</text>
+
+        <text x="206" y="14" text-anchor="middle" font-size="9.5" fill="var(--text-muted)" font-family="monospace">end. 0x104</text>
+        <rect x="164" y="20" width="84" height="54" rx="5" fill="var(--bg-surface)" stroke="var(--accent)" stroke-width="1.8"/>
+        <text x="206" y="37" text-anchor="middle" font-size="10" fill="var(--accent-hover)" font-family="monospace" font-weight="700">int *p=&amp;x</text>
+        <text x="206" y="61" text-anchor="middle" font-size="14" fill="var(--accent-hover)" font-family="monospace" font-weight="700">${m.pAddr}</text>
+
+        <path d="M164 47 L96 47" stroke="#3b82f6" stroke-width="2" marker-end="url(#pArr)"/>
+        <text x="130" y="40" text-anchor="middle" font-size="10" fill="var(--warning)" font-family="monospace" font-weight="700">*p</text>
+        <text x="130" y="96" text-anchor="middle" font-size="10" fill="var(--text-secondary)" font-family="sans-serif">${escapeHtml(m.expr)}</text>
+      </svg>
+    </div>`;
+  }
+  if (m.mode === 'swap') {
+    return `<div class="mem-svg-box">
+      <svg viewBox="0 0 260 105" width="100%">
+        <rect x="10" y="18" width="72" height="50" rx="5" fill="var(--bg-surface)" stroke="var(--warning)" stroke-width="1.8"/>
+        <text x="46" y="34" text-anchor="middle" font-size="10" fill="var(--warning)" font-family="monospace">x (*a)</text>
+        <text x="46" y="56" text-anchor="middle" font-size="18" fill="var(--text-primary)" font-family="monospace" font-weight="700">${m.x}</text>
+
+        <rect x="94" y="18" width="72" height="50" rx="5" fill="var(--bg-surface)" stroke="var(--border-strong)" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <text x="130" y="34" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="monospace">aux</text>
+        <text x="130" y="56" text-anchor="middle" font-size="18" fill="var(--text-secondary)" font-family="monospace" font-weight="700">${m.aux}</text>
+
+        <rect x="178" y="18" width="72" height="50" rx="5" fill="var(--bg-surface)" stroke="var(--warning)" stroke-width="1.8"/>
+        <text x="214" y="34" text-anchor="middle" font-size="10" fill="var(--warning)" font-family="monospace">y (*b)</text>
+        <text x="214" y="56" text-anchor="middle" font-size="18" fill="var(--text-primary)" font-family="monospace" font-weight="700">${m.y}</text>
+        <text x="130" y="90" text-anchor="middle" font-size="10" fill="var(--emerald)" font-family="sans-serif">${escapeHtml(m.expr)}</text>
+      </svg>
+    </div>`;
+  }
+  if (m.mode === 'struct') {
+    return `<div class="mem-svg-box" style="padding:8px;font-family:var(--font-mono);font-size:11.5px;">
+      <div style="color:var(--accent-hover);font-weight:700;margin-bottom:4px;">Aluno *a (0x120) ──▶ ana</div>
+      <div style="display:flex;justify-content:space-between;padding:4px 6px;background:var(--bg-surface);border-radius:4px;margin-bottom:4px;">
+        <span>a-&gt;nome</span><span style="color:var(--syn-str);">"${m.nome}"</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 6px;background:var(--emerald-bg);border-radius:4px;">
+        <span>a-&gt;nota</span><span style="color:var(--emerald);font-weight:700;">${m.nota}</span>
+      </div>
+      <div style="margin-top:6px;font-family:var(--font-ui);font-size:11px;color:var(--text-secondary);">${escapeHtml(m.expr)}</div>
+    </div>`;
+  }
+  if (m.mode === 'bs') {
+    return `<div>
+      <div class="array-strip">
+        ${m.arr.map((v, i) => {
+          const cls = i === m.mid ? 'hi-mid' : i === m.ini ? 'hi-ini' : i === m.fim ? 'hi-fim' : '';
+          const tag = [i===m.ini?'ini':'', i===m.mid?'meio':'', i===m.fim?'fim':''].filter(Boolean).join('/');
+          return `<div class="arr-cell ${cls}" style="${(i<m.ini||i>m.fim)?'opacity:0.32;':''}"><span class="idx">[${i}] ${tag}</span>${v}</div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:8px;font-size:11.5px;color:var(--warning);font-weight:600;">${escapeHtml(m.expr)}</div>
+    </div>`;
+  }
+  return '';
+}
+
+// ===================== RENDERERS =====================
+function renderAll() {
+  renderTabs();
+  renderSidebar();
+  renderEditor();
+  renderDrawer();
+  renderStatus();
+}
+
+function renderTabs() {
+  const list = document.getElementById('tabList');
+  list.innerHTML = state.openTabs.map(name => {
+    const ext = FILES[name]?.ext || 'c';
+    const dotCls = ext === 'h' ? 'dot-h' : name.startsWith('07_') ? 'dot-star' : 'dot-c';
+    return `<div class="editor-tab ${name === state.activeFile ? 'active' : ''}" onclick="openFile('${name}')">
+      <span class="file-dot ${dotCls}"></span>
+      <span>${name}</span>
+      <button class="tab-close" onclick="closeTab(event,'${name}')" title="Fechar aba">×</button>
+    </div>`;
+  }).join('');
+  document.getElementById('headerFileName').textContent = state.activeFile;
+  document.getElementById('crumbFile').textContent = state.activeFile;
+  const meta = ROTEIRO_META[state.activeFile];
+  document.getElementById('blockChip').textContent = meta ? `${meta.block} (${meta.split})` : 'Arquivo C11 avulso';
+}
+
+function extractSymbols(fileName) {
+  const lines = (FILES[fileName]?.content || '').split('\n');
+  const out = [];
+  lines.forEach((l, i) => {
+    const st = l.match(/^\}\s*(\w+)\s*;/);
+    if (st) out.push({ kind: 'S', label: `struct ${st[1]}`, line: Math.max(1, i - 2) });
+    const fn = l.match(/^(?:int|float|double|void|char)\s+\*?(\w+)\s*\([^;]*\)\s*\{/);
+    if (fn) out.push({ kind: 'fn', label: `${fn[1]}()`, line: i + 1 });
+  });
+  return out;
+}
+
+function renderCodeInto(el, fileName, isPrimary) {
+  const text = FILES[fileName]?.content || '';
+  const lines = text.split('\n');
+  const query = isPrimary && document.getElementById('findWidget').classList.contains('open')
+    ? document.getElementById('findInput').value.trim() : '';
+  let matchTotal = 0;
+  const bps = state.breakpoints[fileName] || new Set();
+  const dbgStep = state.debugActive && state.debugFile === fileName
+    ? (DEBUG_SCENARIOS[state.debugFile]?.[state.debugStepIdx] || null) : null;
+
+  el.innerHTML = lines.map((line, i) => {
+    const ln = i + 1;
+    if (query) matchTotal += line.toLowerCase().split(query.toLowerCase()).length - 1;
+    const isAct = isPrimary && ln === state.activeLine;
+    const isDbg = dbgStep && dbgStep.line === ln;
+    const isErr = state.demoError && fileName === '04_ponteiros.c' && (ln === 6 || ln === 28);
+    const hasBp = bps.has(ln);
+    const cls = ['code-line', isAct ? 'active-line' : '', isDbg ? 'debug-line' : '', isErr ? 'error-line' : '', hasBp ? 'has-bp' : ''].filter(Boolean).join(' ');
+    return `<div class="${cls}" data-ln="${ln}" onclick="onLineClick(${ln}, ${isPrimary})">
+      <div class="gutter" onclick="toggleBreakpoint(event,'${fileName}',${ln})" title="Breakpoint linha ${ln} (F4)">
+        <span class="bp-slot"></span>
+        <span class="ln-num">${ln}</span>
+      </div>
+      <div class="code-text">${highlightCLine(line, query)}</div>
+    </div>`;
+  }).join('');
+
+  if (isPrimary) {
+    document.getElementById('findCount').textContent = query ? `${matchTotal} ach.` : '0 / 0';
+    const syms = extractSymbols(fileName);
+    let cur = syms[0]?.label || '(global)';
+    for (const s of syms) if (s.line <= state.activeLine) cur = s.label;
+    document.getElementById('crumbSymbol').textContent = cur;
+  }
+}
+
+function renderEditor() {
+  renderCodeInto(document.getElementById('primaryEditor'), state.activeFile, true);
+  const sec = document.getElementById('secondaryEditor');
+  sec.classList.toggle('open', state.splitOpen);
+  document.getElementById('btnSplit').classList.toggle('active', state.splitOpen);
+  if (state.splitOpen) {
+    const secName = state.activeFile === '07_desafio_integrado.c' ? '04_ponteiros.c' : '07_desafio_integrado.c';
+    renderCodeInto(sec, secName, false);
+  }
+}
+
+function renderSidebar() {
+  document.getElementById('sidebar').classList.toggle('hidden', !state.sidebarOpen);
+  document.querySelectorAll('.rail-btn[data-panel]').forEach(b => {
+    b.classList.toggle('active', state.sidebarOpen && b.dataset.panel === state.sidebarPanel);
+  });
+  document.getElementById('railDebugBtn').classList.toggle('has-badge', state.debugActive);
+
+  const titleEl = document.getElementById('sidebarTitle');
+  const body = document.getElementById('sidebarBody');
+
+  if (state.sidebarPanel === 'roteiro') {
+    titleEl.textContent = 'Roteiro C · 2h30 (PC + Papel)';
+    body.innerHTML = Object.entries(ROTEIRO_META).map(([fn, m]) => `
+      <div class="roteiro-item ${fn === state.activeFile ? 'active' : ''}" onclick="openFile('${fn}')">
+        <div class="roteiro-meta"><span>${m.time}</span><span>${m.split}</span></div>
+        <div class="roteiro-title">${m.block}</div>
+        <div class="roteiro-desc">${m.desc}</div>
+        ${fn === state.activeFile ? `<div class="paper-note">✏️ ${m.paper}</div>` : ''}
+      </div>
+    `).join('');
+  } else if (state.sidebarPanel === 'files') {
+    titleEl.textContent = 'Arquivos do Projeto (.c)';
+    body.innerHTML = `<div class="tree-section-title"><span>ROTEIRO_C_2SEM</span><span>${Object.keys(FILES).length}</span></div>` +
+      Object.keys(FILES).map(name => {
+        const ext = FILES[name].ext;
+        const dotCls = ext === 'h' ? 'dot-h' : name.startsWith('07_') ? 'dot-star' : 'dot-c';
+        return `<button class="tree-item ${name === state.activeFile ? 'active' : ''}" onclick="openFile('${name}')">
+          <span class="file-dot ${dotCls}"></span><span>${name}</span><span class="ext-badge">.${ext}</span>
+        </button>`;
+      }).join('');
+  } else if (state.sidebarPanel === 'outline') {
+    titleEl.textContent = 'Funções & Structs';
+    const syms = extractSymbols(state.activeFile);
+    body.innerHTML = `<div class="tree-section-title"><span>${state.activeFile}</span><span>${syms.length}</span></div>` +
+      syms.map(s => `<button class="tree-item" onclick="jumpToLine('${state.activeFile}', ${s.line})">
+        <span class="ac-kind">${s.kind}</span>
+        <span style="font-family:var(--font-mono);font-size:12px;">${s.label}</span>
+        <span class="ext-badge">:${s.line}</span>
+      </button>`).join('');
+  } else if (state.sidebarPanel === 'search') {
+    titleEl.textContent = 'Buscar nos Arquivos .c';
+    const q = state.searchQuery;
+    const results = [];
+    if (q.length >= 2) {
+      for (const [fn, obj] of Object.entries(FILES)) {
+        obj.content.split('\n').forEach((line, idx) => {
+          if (line.toLowerCase().includes(q.toLowerCase())) results.push({ fn, line: idx + 1, text: line.trim() });
+        });
+      }
+    }
+    body.innerHTML = `
+      <input class="find-input" style="width:100%;margin-bottom:10px;" placeholder="Buscar em todos .c (ex: troca, ->, meio)..." value="${escapeHtml(q)}" oninput="state.searchQuery=this.value;renderSidebar()" />
+      <div class="tree-section-title"><span>RESULTADOS</span><span>${results.length}</span></div>
+      ${results.map(r => `<button class="tree-item" style="flex-direction:column;align-items:flex-start;gap:2px;" onclick="jumpToLine('${r.fn}', ${r.line})">
+        <div style="font-size:11px;color:var(--accent-hover);">${r.fn}:${r.line}</div>
+        <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;">${escapeHtml(r.text)}</div>
+      </button>`).join('') || `<div style="padding:8px;font-size:12px;color:var(--text-muted);">Digite 2+ caracteres (ex: <code>troca</code>, <code>Aluno</code>, <code>meio</code>).</div>`}`;
+  } else if (state.sidebarPanel === 'debug') {
+    titleEl.textContent = 'Memória, Ponteiros & GDB';
+    const step = state.debugActive ? DEBUG_SCENARIOS[state.debugFile]?.[state.debugStepIdx] : null;
+    const localsHtml = step
+      ? Object.entries(step.locals).map(([k, v]) => `<div class="watch-row"><span class="watch-name">${k}</span><span class="watch-val">${escapeHtml(v)}</span></div>`).join('')
+      : `<div style="font-size:11.5px;color:var(--text-muted);">Sem sessão ativa.</div>`;
+    body.innerHTML = `
+      <div class="debug-card">
+        <div class="debug-card-title"><span>Visualizador de Memória (Ao Vivo)</span><span>${state.debugActive ? 'GDB ATIVO' : 'IDLE'}</span></div>
+        ${renderMemoryVisual(step)}
+      </div>
+      <div class="debug-card">
+        <div class="debug-card-title"><span>Variáveis no Passo Atual</span></div>
+        ${localsHtml}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="btn btn-emerald" style="flex:1;height:28px;font-size:11.5px;" onclick="startDebugFor('04_ponteiros.c')">Depurar Ponteiros</button>
+        <button class="btn btn-subtle" style="flex:1;height:28px;font-size:11.5px;" onclick="startDebugFor('06_busca_binaria.c')">Depurar Busca Bin.</button>
+      </div>`;
+  }
+}
+
+function renderDrawer() {
+  document.getElementById('bottomDrawer').classList.toggle('hidden', !state.drawerOpen);
+  document.querySelectorAll('.drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === state.drawerTab));
+  const pCount = document.getElementById('problemsCount');
+  pCount.textContent = state.problems.length;
+  pCount.className = 'pill-count' + (state.problems.some(p => p.sev === 'err') ? ' err' : state.problems.length ? ' warn' : '');
+
+  const body = document.getElementById('drawerBody');
+  if (state.drawerTab === 'terminal') {
+    body.innerHTML = state.terminalLines.map(l => `<div class="term-line ${l.cls || ''}">${escapeHtml(l.text)}</div>`).join('');
+  } else if (state.drawerTab === 'problems') {
+    if (!state.problems.length) {
+      body.innerHTML = `<div class="term-ok" style="font-family:var(--font-ui);">✓ gcc.exe -std=c11 -Wall: 0 erros e 0 avisos!</div>`;
+    } else {
+      body.innerHTML = state.problems.map(p => `<div class="diag-card" onclick="jumpToLine('${p.file}', ${p.line})">
+        <div class="diag-top">
+          <span class="diag-badge ${p.sev}">${p.sev === 'err' ? 'Erro GCC' : 'Aviso'}</span>
+          <strong style="font-size:12.5px;">${escapeHtml(p.msg)}</strong>
+          <span class="diag-loc">${p.file}:${p.line}</span>
+          ${p.fixable ? `<button class="btn btn-subtle" style="height:24px;padding:0 8px;margin-left:6px;" onclick="event.stopPropagation();fixDemoError()">Corrigir 1-clique</button>` : ''}
+        </div>
+        <div class="diag-hint">💡 Dica de C: ${escapeHtml(p.hint)}</div>
+      </div>`).join('');
+    }
+  } else if (state.drawerTab === 'trace') {
+    if (!state.traceHistory.length) {
+      body.innerHTML = `<div class="term-muted" style="font-family:var(--font-ui);">Inicie o <strong>Debug + Memória (F5)</strong> para preencher automaticamente a tabela de <strong>Teste de Mesa</strong> linha a linha (ideal para conferir com o papel!).</div>`;
+    } else {
+      body.innerHTML = `<table class="trace-table">
+        <thead><tr><th>Passo</th><th>Linha</th><th>Função</th><th>Estado das Variáveis</th><th>O que aconteceu</th></tr></thead>
+        <tbody>
+          ${state.traceHistory.map((h, idx) => `<tr class="${idx === state.traceHistory.length - 1 ? 'cur-step' : ''}">
+            <td>#${idx + 1}</td><td>${h.file}:${h.line}</td><td>${h.fn}</td>
+            <td>${Object.entries(h.locals).map(([k,v]) => `${k}=${v}`).join(' · ')}</td>
+            <td style="font-family:var(--font-ui);color:var(--emerald);">${escapeHtml(h.note)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    }
+  } else if (state.drawerTab === 'log') {
+    body.innerHTML = state.compileLog.map(l => `<div class="term-line term-muted">${escapeHtml(l)}</div>`).join('');
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+function renderStatus() {
+  const idx = Number(document.getElementById('compilerSelect').value);
+  document.getElementById('statusCompiler').textContent = COMPILER_SETS[idx];
+  document.getElementById('statusCursor').textContent = `Ln ${state.activeLine}, Col 5`;
+  const errs = state.problems.filter(p => p.sev === 'err').length;
+  const warns = state.problems.filter(p => p.sev === 'warn').length;
+  document.getElementById('statusDiag').textContent = `${errs} erro(s) · ${warns} aviso(s)`;
+  document.getElementById('statusBuildDot').style.background = errs ? 'var(--error)' : state.debugActive ? 'var(--warning)' : 'var(--success)';
+}
+
+// ===================== ACTIONS =====================
+function openFile(name) {
+  if (!FILES[name]) return;
+  if (!state.openTabs.includes(name)) state.openTabs.push(name);
+  state.activeFile = name;
+  state.activeLine = 1;
+  renderAll();
+}
+
+function closeTab(ev, name) {
+  ev.stopPropagation();
+  if (state.openTabs.length <= 1) return toast('Mantenha pelo menos um arquivo .c aberto.');
+  state.openTabs = state.openTabs.filter(t => t !== name);
+  if (state.activeFile === name) state.activeFile = state.openTabs[0];
+  renderAll();
+}
+
+function onLineClick(ln, isPrimary) {
+  if (!isPrimary) return;
+  state.activeLine = ln;
+  renderEditor();
+  renderStatus();
+}
+
+function jumpToLine(file, ln) {
+  if (!state.openTabs.includes(file)) state.openTabs.push(file);
+  state.activeFile = file;
+  state.activeLine = ln;
+  renderAll();
+  const row = document.querySelector(`#primaryEditor .code-line[data-ln="${ln}"]`);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function toggleBreakpoint(ev, file, ln) {
+  ev.stopPropagation();
+  if (!state.breakpoints[file]) state.breakpoints[file] = new Set();
+  const set = state.breakpoints[file];
+  if (set.has(ln)) { set.delete(ln); toast(`Breakpoint removido (${file}:${ln})`); }
+  else { set.add(ln); toast(`Breakpoint adicionado (${file}:${ln})`); }
+  renderEditor();
+}
+
+function selectSidebar(panel) {
+  if (state.sidebarOpen && state.sidebarPanel === panel) state.sidebarOpen = false;
+  else { state.sidebarOpen = true; state.sidebarPanel = panel; }
+  renderSidebar();
+}
+function toggleSidebar() { state.sidebarOpen = !state.sidebarOpen; renderSidebar(); }
+function selectDrawerTab(tab, open = false) { state.drawerTab = tab; if (open) state.drawerOpen = true; renderDrawer(); }
+function toggleDrawer() { state.drawerOpen = !state.drawerOpen; renderDrawer(); }
+function toggleSplit() { state.splitOpen = !state.splitOpen; renderEditor(); }
+function onCompilerChange() { renderStatus(); toast(`Compilador: ${COMPILER_SETS[Number(document.getElementById('compilerSelect').value)]}`); }
+
+// ===================== SIMULATE CLASSIC C EXAM ERRORS =====================
+function toggleDemoError() {
+  state.demoError = !state.demoError;
+  if (state.demoError) {
+    FILES['04_ponteiros.c'].content = FILES['04_ponteiros.c'].content
+      .replace('} Aluno;', '} Aluno // <- esqueceu o ponto e virgula da struct!')
+      .replace('troca(&x, &y);', 'troca(x, y); // <- passou valor sem & !');
+    document.getElementById('btnDemoErr').innerHTML = '<span style="color:var(--error);">● Erros C Ativos</span>';
+    openFile('04_ponteiros.c');
+    toast('2 erros clássicos de prova injetados em 04_ponteiros.c — pressione F11!');
+  } else {
+    fixDemoError();
+  }
+}
+
+function fixDemoError() {
+  state.demoError = false;
+  FILES['04_ponteiros.c'].content = FILES['04_ponteiros.c'].content
+    .replace('} Aluno // <- esqueceu o ponto e virgula da struct!', '} Aluno;')
+    .replace('troca(x, y); // <- passou valor sem & !', 'troca(&x, &y);');
+  state.problems = [];
+  document.getElementById('btnDemoErr').innerHTML = '<span style="color:var(--warning);">⚡ Simular Erro C</span>';
+  toast('Erros corrigidos (; da struct e &x, &y)! Recompilando...');
+  runBuild(true);
+}
+
+function runBuild(andRun) {
+  state.drawerOpen = true;
+  const f = state.activeFile;
+  const exe = f.replace(/\.c$/, '.exe');
+  const cmd = `gcc.exe -std=c11 -Wall -Wextra "${f}" -o "${exe}" -static-libgcc`;
+  state.compileLog = [
+    `[GCC] C:\\Program Files (x86)\\Dev-Cpp\\MinGW64\\bin\\${cmd}`
+  ];
+
+  if (state.demoError && f === '04_ponteiros.c') {
+    state.problems = [
+      {
+        sev: 'err', file: '04_ponteiros.c', line: 6, fixable: true,
+        msg: "expected ';', identifier or '(' before 'void'",
+        hint: 'Em C, toda declaração de struct/typedef struct precisa terminar com ponto e vírgula ";" depois da chave }.'
+      },
+      {
+        sev: 'err', file: '04_ponteiros.c', line: 28, fixable: true,
+        msg: "passing argument 1 of 'troca' makes pointer from integer without a cast",
+        hint: 'A função troca espera ponteiros (int *a, int *b). Use o operador & para passar o endereço: troca(&x, &y);'
+      }
+    ];
+    state.compileLog.push('04_ponteiros.c:6: error: expected ";" after struct', '04_ponteiros.c:28: error: passing int instead of int*', '[Falha] 2 erros encontrados (0.19s).');
+    state.drawerTab = 'problems';
+    renderAll();
+    jumpToLine('04_ponteiros.c', 6);
+    toast('GCC encontrou 2 erros clássicos de C (veja as dicas em Problemas GCC)');
+    return;
+  }
+
+  state.problems = [];
+  state.compileLog.push(`[Sucesso] ${exe} gerado em 0.24s · 0 erros, 0 avisos.`);
+  if (andRun) {
+    const extPauser = document.getElementById('chkExternalPauser').checked;
+    const outLines = ROTEIRO_META[f]?.output || [`Programa ${exe} executado com sucesso!`];
+    state.terminalLines = [
+      { cls: 'term-muted', text: `$ ${cmd}` },
+      { cls: 'term-ok', text: `✓ Compilado em 0.24s (0 erros, 0 avisos)` },
+      { cls: 'term-muted', text: extPauser ? `▶ Executando via ConsolePauser.exe "${exe}"...` : `▶ ./${exe}` },
+      ...outLines.map(t => ({ cls: '', text: t })),
+      { cls: 'term-ok', text: '-------------------------------------------' },
+      { cls: 'term-ok', text: 'Processo encerrado em 0.011s · retorno 0' }
+    ];
+    state.drawerTab = 'terminal';
+    toast(`${f} compilado e executado em 0.24s`);
+  } else {
+    state.drawerTab = 'log';
+    toast(`${f} compilado com 0 erros`);
+  }
+  renderAll();
+}
+
+// ===================== DEBUG + MEMORY VISUALIZER =====================
+function startDebugFor(file) {
+  if (state.demoError && file === '04_ponteiros.c') return toast('Corrija os erros de C antes de depurar.');
+  state.debugFile = DEBUG_SCENARIOS[file] ? file : '04_ponteiros.c';
+  state.debugActive = true;
+  state.debugStepIdx = 0;
+  state.sidebarOpen = true;
+  state.sidebarPanel = 'debug';
+  state.drawerOpen = true;
+  state.drawerTab = 'trace';
+  document.getElementById('compilerSelect').value = '1';
+  document.getElementById('debugFloatingBar').classList.add('visible');
+  document.getElementById('debugBtnLabel').textContent = 'Stop';
+  const step = DEBUG_SCENARIOS[state.debugFile][0];
+  state.traceHistory = [{ file: state.debugFile, ...step }];
+  jumpToLine(state.debugFile, step.line);
+  toast(`Debug + Memória iniciado em ${state.debugFile} — use F7 (Next) para avançar!`);
+}
+
+function toggleDebugSession() {
+  if (state.debugActive) return stopDebugSession();
+  const target = DEBUG_SCENARIOS[state.activeFile] ? state.activeFile : '04_ponteiros.c';
+  startDebugFor(target);
+}
+
+function debugStep(mode) {
+  if (!state.debugActive) return;
+  const steps = DEBUG_SCENARIOS[state.debugFile];
+  if (mode === 'continue') state.debugStepIdx = steps.length - 1;
+  else state.debugStepIdx = (state.debugStepIdx + 1) % steps.length;
+  const step = steps[state.debugStepIdx];
+  if (state.debugStepIdx === 0) state.traceHistory = [{ file: state.debugFile, ...step }];
+  else state.traceHistory.push({ file: state.debugFile, ...step });
+  jumpToLine(state.debugFile, step.line);
+}
+
+function stopDebugSession() {
+  state.debugActive = false;
+  document.getElementById('debugFloatingBar').classList.remove('visible');
+  document.getElementById('debugBtnLabel').textContent = 'Debug + Memória';
+  renderAll();
+  toast('Sessão GDB encerrada.');
+}
+
+// ===================== ASTYLE / FIND / THEME / MODALS =====================
+function formatWithAStyle() {
+  const style = document.getElementById('setAStyle').value;
+  if (state.activeFile === '04_ponteiros.c') {
+    const clean = FILES['04_ponteiros.c'].content;
+    FILES['04_ponteiros.c'].content = FILES['04_ponteiros.c'].messy;
+    renderEditor();
+    setTimeout(() => {
+      FILES['04_ponteiros.c'].content = style === '-A1' ? clean.replace(/\) \{/g, ')\n{') : clean;
+      renderEditor();
+      toast(`AStyle.exe ${style} --indent=tab=4 aplicado em 04_ponteiros.c`);
+    }, 200);
+  } else {
+    toast(`AStyle.exe ${style} --indent=tab=4 aplicado em ${state.activeFile}`);
+  }
+}
+
+function toggleFindWidget() {
+  const w = document.getElementById('findWidget');
+  w.classList.toggle('open');
+  if (w.classList.contains('open')) document.getElementById('findInput').focus();
+  renderEditor();
+}
+
+function replaceInActiveFile() {
+  const f = document.getElementById('findInput').value;
+  const r = document.getElementById('replaceInput').value;
+  if (!f) return;
+  const before = FILES[state.activeFile].content;
+  const after = before.split(f).join(r);
+  if (before === after) return toast('Nenhuma ocorrência encontrada.');
+  FILES[state.activeFile].content = after;
+  renderEditor();
+  toast(`Substituído "${f}" por "${r}"`);
+}
+
+function toggleAutocomplete() { document.getElementById('acPopup').classList.toggle('open'); }
+function insertAc(s) { document.getElementById('acPopup').classList.remove('open'); toast(`Inserido: ${s}`); }
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('setTheme').value = t;
+  document.getElementById('themeIcon').innerHTML = t === 'dark'
+    ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'
+    : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+}
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  toast(next === 'dark' ? 'Tema Obsidian Slate (Dark)' : 'Tema Daylight Paper (Light — alinhado ao seu roteiro)');
+}
+function applyEditorFont() {
+  document.documentElement.style.setProperty('--font-mono', document.getElementById('setFont').value);
+  document.documentElement.style.setProperty('--editor-font-size', document.getElementById('setFontSize').value);
+}
+function updateAStyleStatus() {
+  const s = document.getElementById('setAStyle').value;
+  const lbl = s === '-A3' ? '-A3 K&R' : s === '-A1' ? '-A1 Allman' : '-A2 Java';
+  document.getElementById('statusAStyle').textContent = `AStyle 2.03 (${lbl})`;
+}
+function updateKeymap() {
+  document.getElementById('statusKeymap').textContent = document.getElementById('setKeymap').value === 'hybrid' ? 'Keymap: Híbrido' : 'Keymap: Clássico 5.11';
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); if (id === 'templateModal') renderTemplates(); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(ev, id) { if (ev.target.id === id) closeModal(id); }
+
+function renderTemplates() {
+  document.getElementById('tplGrid').innerHTML = TEMPLATES.map((t, idx) => `
+    <button class="tpl-card ${idx === state.selectedTemplate ? 'selected' : ''}" onclick="state.selectedTemplate=${idx};renderTemplates()">
+      <div class="tpl-cat">${t.cat}</div>
+      <div class="tpl-name">${t.name}</div>
+      <div class="tpl-desc">${t.desc}</div>
+    </button>`).join('');
+  document.getElementById('tplPreview').textContent = TEMPLATES[state.selectedTemplate].code;
+}
+
+function applySelectedTemplate() {
+  const tpl = TEMPLATES[state.selectedTemplate];
+  FILES[tpl.file] = { ext: tpl.file.endsWith('.h') ? 'h' : 'c', content: tpl.code };
+  closeModal('templateModal');
+  openFile(tpl.file);
+  toast(`Criado ${tpl.file} (${tpl.name})`);
+}
+
+const COMMANDS = [
+  { cat: 'Build', label: 'Compile & Run com gcc.exe -std=c11', kbd: 'F11', fn: () => runBuild(true) },
+  { cat: 'Build', label: 'Compile (Apenas Compilar C)', kbd: 'F9', fn: () => runBuild(false) },
+  { cat: 'Debug', label: 'Depurar Ponteiros (Caixinhas de Memória SVG)', kbd: 'F5', fn: () => startDebugFor('04_ponteiros.c') },
+  { cat: 'Debug', label: 'Depurar Binary Search (ini / meio / fim)', kbd: '', fn: () => startDebugFor('06_busca_binaria.c') },
+  { cat: 'AStyle', label: 'Formatar Código C com AStyle.exe', kbd: 'Ctrl+Shift+A', fn: () => formatWithAStyle() },
+  { cat: 'Roteiro', label: 'Abrir Bloco 1 — Funções (01_funcoes.c)', kbd: '', fn: () => openFile('01_funcoes.c') },
+  { cat: 'Roteiro', label: 'Abrir Bloco 2 — Matrizes (02_matrizes.c)', kbd: '', fn: () => openFile('02_matrizes.c') },
+  { cat: 'Roteiro', label: 'Abrir Bloco 3 — Struct (03_struct.c)', kbd: '', fn: () => openFile('03_struct.c') },
+  { cat: 'Roteiro', label: 'Abrir Bloco 4 — Ponteiros (04_ponteiros.c)', kbd: '', fn: () => openFile('04_ponteiros.c') },
+  { cat: 'Roteiro', label: 'Abrir Bloco 5 — Ordenação (05_ordenacao.c)', kbd: '', fn: () => openFile('05_ordenacao.c') },
+  { cat: 'Roteiro', label: 'Abrir Bloco 6 — Binary Search (06_busca_binaria.c)', kbd: '', fn: () => openFile('06_busca_binaria.c') },
+  { cat: 'Roteiro', label: 'Abrir Desafio Final Integrado (07_desafio_integrado.c)', kbd: '', fn: () => openFile('07_desafio_integrado.c') },
+  { cat: 'Templates', label: 'Novo Arquivo a partir de Template C', kbd: 'Ctrl+Shift+N', fn: () => openModal('templateModal') },
+  { cat: 'Tema', label: 'Alternar Tema Dark / Light', kbd: '', fn: () => toggleTheme() },
+  { cat: 'View', label: 'Comparar Dev-C++ 5.11 vs. Dev-C Next', kbd: '', fn: () => openModal('compareModal') }
+];
+
+let paletteIdx = 0;
+function openPalette() {
+  paletteIdx = 0; document.getElementById('paletteInput').value = '';
+  openModal('paletteModal'); renderPalette();
+  setTimeout(() => document.getElementById('paletteInput').focus(), 20);
+}
+function getFilteredCommands() {
+  const q = document.getElementById('paletteInput').value.trim().toLowerCase();
+  return COMMANDS.filter(c => (c.cat + ' ' + c.label).toLowerCase().includes(q));
+}
+function renderPalette() {
+  const items = getFilteredCommands();
+  if (paletteIdx >= items.length) paletteIdx = 0;
+  document.getElementById('paletteList').innerHTML = items.map((c, idx) => `
+    <div class="palette-item ${idx === paletteIdx ? 'selected' : ''}" onclick="execPaletteItem(${idx})">
+      <div><span class="palette-cat">${c.cat}</span><span>${c.label}</span></div>
+      ${c.kbd ? `<span class="kbd">${c.kbd}</span>` : ''}
+    </div>`).join('') || `<div style="padding:14px;color:var(--text-muted);text-align:center;">Nenhum comando encontrado.</div>`;
+}
+function execPaletteItem(idx) { const items = getFilteredCommands(); if (!items[idx]) return; closeModal('paletteModal'); items[idx].fn(); }
+
+function toast(msg) {
+  const stack = document.getElementById('toastStack');
+  const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 200ms'; setTimeout(() => el.remove(), 220); }, 2900);
+}
+
+function initSplitters() {
+  const leftSpl = document.getElementById('splitterLeft');
+  const botSpl = document.getElementById('splitterBottom');
+  leftSpl.addEventListener('mousedown', e => {
+    e.preventDefault(); leftSpl.classList.add('dragging');
+    const onMove = ev => document.documentElement.style.setProperty('--sidebar-w', Math.max(210, Math.min(480, ev.clientX - 46)) + 'px');
+    const onUp = () => { leftSpl.classList.remove('dragging'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+  });
+  botSpl.addEventListener('mousedown', e => {
+    e.preventDefault(); botSpl.classList.add('dragging');
+    const onMove = ev => document.documentElement.style.setProperty('--drawer-h', Math.max(115, Math.min(window.innerHeight * 0.55, window.innerHeight - ev.clientY - 26)) + 'px');
+    const onUp = () => { botSpl.classList.remove('dragging'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+  });
+}
+
+window.addEventListener('keydown', e => {
+  if (document.getElementById('paletteModal').classList.contains('open')) {
+    const items = getFilteredCommands();
+    if (e.key === 'Escape') { closeModal('paletteModal'); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteIdx = (paletteIdx + 1) % Math.max(1, items.length); renderPalette(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); paletteIdx = (paletteIdx - 1 + Math.max(1, items.length)) % Math.max(1, items.length); renderPalette(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); execPaletteItem(paletteIdx); return; }
+    return;
+  }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+    document.getElementById('acPopup').classList.remove('open');
+    document.getElementById('findWidget').classList.remove('open');
+    renderEditor(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); openPalette(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') { e.preventDefault(); formatWithAStyle(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); openModal('templateModal'); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); toggleFindWidget(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === '`') { e.preventDefault(); toggleDrawer(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'Space') { e.preventDefault(); toggleAutocomplete(); return; }
+  if (e.key === 'F9') { e.preventDefault(); runBuild(false); return; }
+  if (e.key === 'F11') { e.preventDefault(); runBuild(true); return; }
+  if (e.key === 'F5') { e.preventDefault(); toggleDebugSession(); return; }
+  if (e.key === 'F7' && state.debugActive) { e.preventDefault(); debugStep('over'); return; }
+  if (e.key === 'F8' && state.debugActive) { e.preventDefault(); debugStep('into'); return; }
+  if (e.key === 'F6' && state.debugActive) { e.preventDefault(); stopDebugSession(); return; }
+  if (e.key === 'F4') { e.preventDefault(); toggleBreakpoint(e, state.activeFile, state.activeLine); return; }
+});
+
+initSplitters();
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DEVSHOW C++ — IDE Moderna para C/C++</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="badge">C11</span>
+          <h1>DEVSHOW C++</h1>
+        </div>
+        <span class="subtitle">Tauri v2 · Rust + WebView2</span>
+      </header>
+
+      <section class="card">
+        <h2>Toolchain local detectado</h2>
+        <p id="base-dir" class="muted">Verificando instalação do MinGW64 / Dev-C++...</p>
+        <ul id="toolchain-list" class="tool-list"></ul>
+        <button id="refresh-btn" type="button">Reverificar Toolchain</button>
+      </section>
+    </main>
+  </body>
+</html>

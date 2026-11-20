@@ -35,6 +35,7 @@ import {
   type Extension,
 } from "@codemirror/state";
 import {
+  Decoration,
   drawSelection,
   dropCursor,
   EditorView,
@@ -45,12 +46,48 @@ import {
   keymap,
   lineNumbers,
   rectangularSelection,
+  type DecorationSet,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 
-// ===================== BREAKPOINT GUTTER =====================
+// ===================== BREAKPOINT & DIAGNOSTIC FIELDS =====================
 const toggleBreakpointEffect = StateEffect.define<{ pos: number; on: boolean }>();
 const setBreakpointsEffect = StateEffect.define<number[]>();
+const setDiagnosticsEffect = StateEffect.define<
+  Array<{ line: number; severity: "error" | "warning" }>
+>();
+
+const diagErrorLineDeco = Decoration.line({ class: "cm-diag-error" });
+const diagWarnLineDeco = Decoration.line({ class: "cm-diag-warning" });
+
+const diagnosticLinesField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decos, tr) {
+    let next = decos.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setDiagnosticsEffect)) {
+        const seen = new Map<number, "error" | "warning">();
+        for (const item of e.value) {
+          if (item.line < 1 || item.line > tr.state.doc.lines) continue;
+          const prev = seen.get(item.line);
+          if (prev !== "error") {
+            seen.set(item.line, item.severity);
+          }
+        }
+        const sorted = [...seen.entries()].sort((a, b) => a[0] - b[0]);
+        const ranges = sorted.map(([lineNo, sev]) => {
+          const from = tr.state.doc.line(lineNo).from;
+          return (sev === "error" ? diagErrorLineDeco : diagWarnLineDeco).range(from);
+        });
+        next = Decoration.set(ranges, true);
+      }
+    }
+    return next;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 class BreakpointMarker extends GutterMarker {
   toDOM(): HTMLElement {
@@ -313,6 +350,14 @@ const devShowEditorTheme = EditorView.theme({
     backgroundColor: "rgba(245, 158, 11, 0.25)",
     borderRadius: "2px",
   },
+  ".cm-diag-error": {
+    backgroundColor: "rgba(239, 68, 68, 0.14)",
+    boxShadow: "inset 3px 0 0 var(--error)",
+  },
+  ".cm-diag-warning": {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    boxShadow: "inset 3px 0 0 var(--warning)",
+  },
 });
 
 export interface EditorCallbacks {
@@ -355,6 +400,7 @@ export class DevShowEditor {
 
     return [
       breakpointField,
+      diagnosticLinesField,
       bpGutter,
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -518,5 +564,23 @@ export class DevShowEditor {
 
   public focus(): void {
     this.view.focus();
+  }
+
+  public setDiagnostics(
+    items: Array<{ line: number; severity: "error" | "warning" }>
+  ): void {
+    this.view.dispatch({
+      effects: setDiagnosticsEffect.of(items),
+    });
+  }
+
+  public replaceContentPreservingUndo(newContent: string): void {
+    const current = this.view.state.doc.toString();
+    if (current === newContent) return;
+    const prevCursor = Math.min(this.view.state.selection.main.head, newContent.length);
+    this.view.dispatch({
+      changes: { from: 0, to: current.length, insert: newContent },
+      selection: { anchor: prevCursor },
+    });
   }
 }

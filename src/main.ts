@@ -5,19 +5,27 @@ import {
 } from "./data/cContent";
 import { DevShowEditor } from "./editor/cmEditor";
 import {
+  compileSource,
   createFileFromTemplate,
   detectToolchain,
   ensureRoteiroWorkspace,
+  formatWithAStyle,
   isTauriRuntime,
   listWorkspaceFiles,
+  onRunnerExit,
+  onRunnerOutput,
   pickFolderDialog,
   pickOpenFileDialog,
   pickSaveFileDialog,
   readTextFile,
+  runProgram,
   searchInDirectory,
+  sendProgramStdin,
+  stopRunningProgram,
   writeTextFile,
 } from "./ipc/tauriBridge";
 import type {
+  CompileDiagnostic,
   DrawerTab,
   EditorSettings,
   KeymapMode,
@@ -37,7 +45,7 @@ interface PaletteCommand {
   run: () => void | Promise<void>;
 }
 
-interface TerminalLine {
+interface TerminalChunk {
   cls: string;
   text: string;
 }
@@ -60,7 +68,13 @@ interface AppState {
   selectedTemplateIdx: number;
   searchQuery: string;
   searchResults: SearchMatch[];
-  terminalLines: TerminalLine[];
+  diagnostics: CompileDiagnostic[];
+  lastExecutableBySource: Map<string, string>;
+  isCompiling: boolean;
+  isRunning: boolean;
+  activeRunId: number | null;
+  useConsolePauser: boolean;
+  terminalChunks: TerminalChunk[];
   compileLog: string[];
   settings: EditorSettings;
 }
@@ -83,14 +97,20 @@ const state: AppState = {
   selectedTemplateIdx: 0,
   searchQuery: "",
   searchResults: [],
-  terminalLines: [
+  diagnostics: [],
+  lastExecutableBySource: new Map<string, string>(),
+  isCompiling: false,
+  isRunning: false,
+  activeRunId: null,
+  useConsolePauser: false,
+  terminalChunks: [
     {
       cls: "term-muted",
-      text: "DEVSHOW C++ · Entrega 1 (Shell Tauri v2 + CodeMirror 6 + Operações reais de arquivos .c/.h)",
+      text: "DEVSHOW C++ · Pronto para compilar e executar em C11 (F9 Compile · F10 Run · F11 Compile & Run · Ctrl+Shift+A AStyle)\n",
     },
   ],
   compileLog: [
-    "Pronto para compilar na Entrega 2 (gcc.exe / g++.exe / AStyle.exe detectados localmente).",
+    "Aguardando compilação (F9 / F11)...",
   ],
   settings: {
     theme: "dark",
@@ -139,6 +159,15 @@ function baseName(fullPath: string): string {
   return parts[parts.length - 1] || fullPath;
 }
 
+function dirName(fullPath: string): string {
+  const idx = Math.max(fullPath.lastIndexOf("\\"), fullPath.lastIndexOf("/"));
+  return idx > 0 ? fullPath.slice(0, idx) : "";
+}
+
+function normalizePathKey(p: string): string {
+  return p.replace(/\//g, "\\").toLowerCase();
+}
+
 function getActiveTab(): OpenTab | null {
   return state.tabs.find((t) => t.path === state.activePath) ?? null;
 }
@@ -182,12 +211,40 @@ function toast(msg: string): void {
   }, 2900);
 }
 
-function appendTerminal(text: string, cls = ""): void {
-  state.terminalLines.push({ cls, text });
-  if (state.terminalLines.length > 200) {
-    state.terminalLines.shift();
+function appendTerminalChunk(text: string, cls = ""): void {
+  const last = state.terminalChunks[state.terminalChunks.length - 1];
+  if (last && last.cls === cls) {
+    last.text += text;
+  } else {
+    state.terminalChunks.push({ cls, text });
   }
-  renderDrawer();
+  if (state.terminalChunks.length > 400) {
+    state.terminalChunks.splice(0, state.terminalChunks.length - 400);
+  }
+  if (state.drawerTab === "terminal") {
+    renderDrawer();
+  }
+}
+
+function applyDiagnosticsToEditor(): void {
+  const tab = getActiveTab();
+  if (!tab) return;
+  const tabKey = normalizePathKey(tab.path);
+  const tabBase = tab.name.toLowerCase();
+
+  const matching = state.diagnostics
+    .filter((d) => {
+      if (d.severity !== "error" && d.severity !== "warning") return false;
+      if (!d.file) return true;
+      const dk = normalizePathKey(d.file);
+      return dk === tabKey || baseName(d.file).toLowerCase() === tabBase;
+    })
+    .map((d) => ({
+      line: d.line,
+      severity: d.severity as "error" | "warning",
+    }));
+
+  primaryEditor.setDiagnostics(matching);
 }
 
 // ===================== WORKSPACE & FILE OPERATIONS =====================
@@ -212,8 +269,8 @@ async function openRoteiroWorkspace(): Promise<void> {
       const ws = await ensureRoteiroWorkspace(seeds);
       state.workspaceDir = ws.dir_path;
       state.workspaceEntries = ws.entries;
-      appendTerminal(
-        `✓ Workspace do Roteiro C pronto em: ${ws.dir_path} (${ws.created_count} novo(s) arquivo(s) .c)`,
+      appendTerminalChunk(
+        `✓ Workspace do Roteiro C pronto em: ${ws.dir_path} (${ws.created_count} novo(s) arquivo(s) .c)\n`,
         "term-ok"
       );
 
@@ -226,11 +283,10 @@ async function openRoteiroWorkspace(): Promise<void> {
       renderAll();
       return;
     } catch (err) {
-      appendTerminal(`Aviso ao preparar Roteiro em disco: ${String(err)}`, "term-warn");
+      appendTerminalChunk(`Aviso ao preparar Roteiro em disco: ${String(err)}\n`, "term-warn");
     }
   }
 
-  // Fallback for browser-only Vite preview without Tauri
   state.workspaceDir = "Roteiro_C_Memoria";
   state.workspaceEntries = ROTEIRO_LESSONS.map((l) => ({
     name: l.fileName,
@@ -265,7 +321,9 @@ function openVirtualTab(path: string, name: string, content: string): void {
 }
 
 async function openDiskFile(filePath: string): Promise<void> {
-  const existing = state.tabs.find((t) => t.path === filePath);
+  const existing = state.tabs.find(
+    (t) => normalizePathKey(t.path) === normalizePathKey(filePath)
+  );
   if (existing) {
     activateTab(existing.path);
     return;
@@ -313,7 +371,6 @@ async function openRoteiroLesson(fileName: string): Promise<void> {
       await openDiskFile(existingEntry.path);
       return;
     }
-    // Ensure roteiro workspace exists so every lesson is a real file on disk
     const ws = await ensureRoteiroWorkspace(
       ROTEIRO_LESSONS.map((l) => ({ name: l.fileName, content: l.code }))
     );
@@ -338,6 +395,7 @@ function activateTab(path: string): void {
     tab.content,
     state.breakpoints.get(tab.path) ?? []
   );
+  applyDiagnosticsToEditor();
   syncSecondaryEditor();
   renderAll();
 }
@@ -382,6 +440,7 @@ function closeTab(path: string): void {
         next.content,
         state.breakpoints.get(next.path) ?? []
       );
+      applyDiagnosticsToEditor();
     } else {
       primaryEditor.openDocument("__empty__", "", []);
     }
@@ -431,7 +490,6 @@ async function saveActiveTab(forceSaveAs = false): Promise<boolean> {
         state.breakpoints.get(oldPath) ?? []
       );
     }
-    toast(`Salvo: ${tab.name}`);
     await refreshWorkspaceTree();
     renderAll();
     return true;
@@ -448,7 +506,7 @@ async function handleOpenFolder(): Promise<void> {
   state.sidebarOpen = true;
   state.sidebarPanel = "files";
   await refreshWorkspaceTree();
-  appendTerminal(`Pasta aberta: ${dir}`, "term-ok");
+  appendTerminalChunk(`Pasta aberta: ${dir}\n`, "term-ok");
   const firstFile = state.workspaceEntries.find((e) => !e.is_dir);
   if (firstFile) {
     await openDiskFile(firstFile.path);
@@ -532,6 +590,220 @@ async function runWorkspaceSearch(query: string): Promise<void> {
   renderSidebar();
 }
 
+// ===================== REAL COMPILE / RUN / STOP / ASTYLE =====================
+function syncRunControls(): void {
+  el<HTMLButtonElement>("btnStopRun").classList.toggle("hidden", !state.isRunning);
+  const showStdin =
+    state.isRunning && state.drawerOpen && state.drawerTab === "terminal";
+  el<HTMLFormElement>("stdinBar").classList.toggle("hidden", !showStdin);
+}
+
+async function compileActiveFile(andRun: boolean): Promise<void> {
+  if (state.isCompiling) return;
+  const tab = getActiveTab();
+  if (!tab) {
+    toast("Abra um arquivo .c ou .cpp antes de compilar.");
+    return;
+  }
+  if (!isTauriRuntime()) {
+    toast("Compilação real requer o app desktop (npm run tauri dev).");
+    return;
+  }
+
+  // Always save before compiling
+  if (tab.dirty || tab.virtualOnly) {
+    const ok = await saveActiveTab(false);
+    if (!ok) return;
+  }
+
+  const profile =
+    COMPILER_PROFILES.find((p) => p.id === state.selectedProfileId) ??
+    COMPILER_PROFILES[0];
+  const isCppExt = ["cpp", "cc", "cxx", "hpp"].includes(tab.ext);
+  const compiler: "gcc" | "g++" = isCppExt ? "g++" : profile.compiler;
+  const flags =
+    isCppExt && profile.compiler === "gcc"
+      ? ["-std=c++17", "-Wall", "-Wextra", "-g", "-static-libgcc"]
+      : profile.flags;
+
+  state.isCompiling = true;
+  state.drawerOpen = true;
+  state.compileLog = [`[Build] ${profile.label}`, `[Arquivo] ${tab.path}`];
+  renderStatus();
+
+  try {
+    const res = await compileSource(tab.path, compiler, flags);
+    state.diagnostics = res.diagnostics;
+    applyDiagnosticsToEditor();
+
+    state.compileLog = [
+      `[Comando] ${res.command_line}`,
+      ...(res.raw_output ? res.raw_output.split("\n") : []),
+      res.success
+        ? `[Sucesso] ${baseName(res.executable_path)} gerado em ${res.duration_ms} ms.`
+        : `[Falha] Compilação encerrada com erro em ${res.duration_ms} ms.`,
+    ];
+
+    const errCount = res.diagnostics.filter((d) => d.severity === "error").length;
+    const warnCount = res.diagnostics.filter((d) => d.severity === "warning").length;
+
+    if (!res.success) {
+      state.drawerTab = "problems";
+      renderAll();
+      const firstErr =
+        res.diagnostics.find((d) => d.severity === "error") ?? res.diagnostics[0];
+      if (firstErr) {
+        await jumpToDiagnostic(firstErr);
+      }
+      toast(
+        `Compilação falhou (${errCount} erro(s), ${warnCount} aviso(s)) em ${res.duration_ms} ms.`
+      );
+      return;
+    }
+
+    state.lastExecutableBySource.set(tab.path, res.executable_path);
+    if (andRun) {
+      state.terminalChunks = [
+        {
+          cls: "term-ok",
+          text: `✓ Compilado (${compiler}.exe) em ${res.duration_ms} ms${warnCount > 0 ? ` · ${warnCount} aviso(s)` : ""}\n`,
+        },
+        {
+          cls: "term-muted",
+          text: `▶ Executando ${baseName(res.executable_path)}...\n`,
+        },
+      ];
+      state.drawerTab = "terminal";
+      renderAll();
+      await launchExecutable(res.executable_path, dirName(tab.path));
+    } else {
+      state.drawerTab = warnCount > 0 ? "problems" : "log";
+      renderAll();
+      toast(
+        `Compilado com sucesso em ${res.duration_ms} ms${warnCount > 0 ? ` (${warnCount} aviso(s))` : ""}!`
+      );
+    }
+  } catch (err) {
+    state.compileLog.push(`[Erro] ${String(err)}`);
+    state.drawerTab = "log";
+    renderAll();
+    toast(`Erro ao compilar: ${String(err)}`);
+  } finally {
+    state.isCompiling = false;
+    renderStatus();
+  }
+}
+
+async function launchExecutable(
+  executablePath: string,
+  workingDir: string
+): Promise<void> {
+  if (!isTauriRuntime()) return;
+  try {
+    state.isRunning = !state.useConsolePauser;
+    syncRunControls();
+    const runId = await runProgram(executablePath, {
+      workingDir,
+      useConsolePauser: state.useConsolePauser,
+    });
+    state.activeRunId = runId;
+    syncRunControls();
+    if (state.isRunning) {
+      el<HTMLInputElement>("stdinInput").focus();
+    }
+  } catch (err) {
+    state.isRunning = false;
+    syncRunControls();
+    appendTerminalChunk(`\n[Erro ao executar] ${String(err)}\n`, "term-err");
+    toast(`Erro ao executar: ${String(err)}`);
+  }
+}
+
+async function runCurrentProgram(): Promise<void> {
+  const tab = getActiveTab();
+  if (!tab) {
+    toast("Nenhum arquivo aberto.");
+    return;
+  }
+  const knownExe =
+    state.lastExecutableBySource.get(tab.path) ??
+    tab.path.replace(/\.(c|cpp|cc|cxx)$/i, ".exe");
+
+  state.drawerOpen = true;
+  state.drawerTab = "terminal";
+  state.terminalChunks = [
+    { cls: "term-muted", text: `▶ Executando ${baseName(knownExe)}...\n` },
+  ];
+  renderDrawer();
+  await launchExecutable(knownExe, dirName(tab.path));
+}
+
+async function stopExecution(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  try {
+    const stopped = await stopRunningProgram();
+    if (stopped) {
+      toast("Programa interrompido.");
+    }
+  } catch (err) {
+    toast(`Erro ao parar execução: ${String(err)}`);
+  }
+}
+
+async function handleSendStdin(rawValue: string): Promise<void> {
+  if (!state.isRunning) return;
+  try {
+    await sendProgramStdin(rawValue);
+    appendTerminalChunk(`${rawValue}\n`, "term-stdin");
+  } catch (err) {
+    appendTerminalChunk(`[stdin erro] ${String(err)}\n`, "term-err");
+  }
+}
+
+async function formatActiveWithAStyle(): Promise<void> {
+  const tab = getActiveTab();
+  if (!tab) {
+    toast("Abra um arquivo C/C++ para formatar.");
+    return;
+  }
+  if (!isTauriRuntime()) {
+    toast("Formatação via AStyle.exe requer o app desktop (npm run tauri dev).");
+    return;
+  }
+
+  try {
+    const res = await formatWithAStyle(
+      tab.content,
+      state.settings.astyleStyle,
+      state.settings.tabSize
+    );
+    if (!res.changed) {
+      toast(`Código já está formatado (${res.command_summary}).`);
+      return;
+    }
+    primaryEditor.replaceContentPreservingUndo(res.formatted_code);
+    toast(`Formatado com ${res.command_summary} (Ctrl+Z para desfazer).`);
+  } catch (err) {
+    toast(`Erro no AStyle: ${String(err)}`);
+  }
+}
+
+async function jumpToDiagnostic(diag: CompileDiagnostic): Promise<void> {
+  const activeTab = getActiveTab();
+  if (diag.file) {
+    let targetPath = diag.file;
+    const isAbsolute = /^[a-zA-Z]:[\\/]/.test(targetPath) || targetPath.startsWith("/");
+    if (!isAbsolute && activeTab) {
+      const base = dirName(activeTab.path);
+      if (base) targetPath = `${base}\\${targetPath}`;
+    }
+    if (!activeTab || normalizePathKey(activeTab.path) !== normalizePathKey(targetPath)) {
+      await openDiskFile(targetPath);
+    }
+  }
+  primaryEditor.goToLine(diag.line);
+}
+
 // ===================== TOOLCHAIN =====================
 async function loadToolchain(): Promise<void> {
   const report = await detectToolchain();
@@ -540,7 +812,7 @@ async function loadToolchain(): Promise<void> {
   const gcc = report.tools.find((t) => t.name === "gcc");
 
   el<HTMLSpanElement>("statusToolchain").textContent = gcc?.found
-    ? `Toolchain OK (${foundCount}/5 · gcc.exe pronto)`
+    ? `Toolchain OK (${foundCount}/5 · gcc.exe)`
     : isTauriRuntime()
       ? `Toolchain parcial (${foundCount}/5)`
       : "Modo Navegador (Vite)";
@@ -568,54 +840,6 @@ function renderToolchainModalList(): void {
       </li>`
     )
     .join("");
-}
-
-// ===================== BUILD/DEBUG/ASTYLE HOOKS (ENTREGAS 2 & 3) =====================
-async function triggerPlannedAction(
-  kind: "compile" | "run" | "debug" | "astyle"
-): Promise<void> {
-  const tab = getActiveTab();
-  if (tab && tab.dirty) {
-    await saveActiveTab(false);
-  }
-  const profile =
-    COMPILER_PROFILES.find((p) => p.id === state.selectedProfileId) ??
-    COMPILER_PROFILES[0];
-  const fileLabel = tab ? tab.name : "nenhum arquivo";
-
-  state.drawerOpen = true;
-  if (kind === "compile" || kind === "run") {
-    const gccPath =
-      state.toolchain?.tools.find((t) => t.name === profile.compiler)?.path ??
-      `${profile.compiler}.exe`;
-    state.drawerTab = "terminal";
-    appendTerminal(
-      `[Entrega 2] ${kind === "compile" ? "Compile (F9)" : "Compile & Run (F11)"} agendado para "${fileLabel}" usando ${gccPath} ${profile.flags.join(" ")}`,
-      "term-warn"
-    );
-    toast(
-      `Arquivo salvo! Execução real de ${profile.compiler}.exe entra na Entrega 2.`
-    );
-  } else if (kind === "astyle") {
-    const astylePath =
-      state.toolchain?.tools.find((t) => t.name === "astyle")?.path ??
-      "AStyle.exe";
-    state.drawerTab = "log";
-    state.compileLog.push(
-      `[Entrega 2] AStyle pronto: "${astylePath}" ${state.settings.astyleStyle} --indent=tab=4 "${fileLabel}"`
-    );
-    renderDrawer();
-    toast(
-      `Formatação real via AStyle.exe (${state.settings.astyleStyle}) entra na Entrega 2.`
-    );
-  } else {
-    state.sidebarOpen = true;
-    state.sidebarPanel = "debug";
-    renderSidebar();
-    toast(
-      `Depurador GDB/MI + Memória SVG ao vivo entra na Entrega 3 (breakpoints da calha já registrados!).`
-    );
-  }
 }
 
 // ===================== RENDERERS =====================
@@ -823,15 +1047,47 @@ function renderDrawer(): void {
     btn.classList.toggle("active", btn.dataset.dtab === state.drawerTab);
   });
 
+  const actionableDiags = state.diagnostics.filter(
+    (d) => d.severity === "error" || d.severity === "warning"
+  );
+  const hasErr = actionableDiags.some((d) => d.severity === "error");
+  const pCount = el<HTMLSpanElement>("problemsCount");
+  pCount.textContent = String(actionableDiags.length);
+  pCount.className = `pill-count${hasErr ? " err" : actionableDiags.length > 0 ? " warn" : ""}`;
+
   const body = el<HTMLDivElement>("drawerBody");
   if (state.drawerTab === "terminal") {
-    body.innerHTML = state.terminalLines
-      .map(
-        (l) => `<div class="term-line ${escapeHtml(l.cls)}">${escapeHtml(l.text)}</div>`
-      )
+    const spans = state.terminalChunks
+      .map((c) => `<span class="${escapeHtml(c.cls)}">${escapeHtml(c.text)}</span>`)
       .join("");
+    body.innerHTML = `<pre class="terminal-pre">${spans}</pre>`;
   } else if (state.drawerTab === "problems") {
-    body.innerHTML = `<div class="term-ok" style="font-family:var(--font-ui);">✓ Nenhum diagnóstico pendente. O parser de erros do GCC + tradutor pedagógico entra na Entrega 2.</div>`;
+    if (state.diagnostics.length === 0) {
+      body.innerHTML = `<div class="term-ok" style="font-family:var(--font-ui);">✓ Nenhum erro ou aviso no último build.</div>`;
+    } else {
+      body.innerHTML = state.diagnostics
+        .map((d, idx) => {
+          const badgeLabel =
+            d.severity === "error"
+              ? "Erro GCC"
+              : d.severity === "warning"
+                ? "Aviso"
+                : "Nota";
+          const loc = d.file
+            ? `${baseName(d.file)}:${d.line}:${d.column}`
+            : `Ln ${d.line}`;
+          return `
+            <div class="diag-card" data-diag-idx="${idx}">
+              <div class="diag-top">
+                <span class="diag-badge ${d.severity}">${badgeLabel}</span>
+                <span class="diag-msg">${escapeHtml(d.message)}</span>
+                <span class="diag-loc">${escapeHtml(loc)}</span>
+              </div>
+              ${d.hint ? `<div class="diag-hint">💡 ${escapeHtml(d.hint)}</div>` : ""}
+            </div>`;
+        })
+        .join("");
+    }
   } else if (state.drawerTab === "trace") {
     body.innerHTML = `<div class="term-muted" style="font-family:var(--font-ui);">A tabela automática de <strong>Teste de Mesa</strong> será alimentada pelo depurador GDB/MI na Entrega 3.</div>`;
   } else {
@@ -839,7 +1095,9 @@ function renderDrawer(): void {
       .map((l) => `<div class="term-line term-muted">${escapeHtml(l)}</div>`)
       .join("");
   }
+
   body.scrollTop = body.scrollHeight;
+  syncRunControls();
 }
 
 function renderStatus(): void {
@@ -847,6 +1105,14 @@ function renderStatus(): void {
   el<HTMLSpanElement>("statusWorkspacePath").textContent = state.workspaceDir
     ? `Pasta: ${state.workspaceDir}`
     : "Workspace: nenhum";
+
+  const errs = state.diagnostics.filter((d) => d.severity === "error").length;
+  const warns = state.diagnostics.filter((d) => d.severity === "warning").length;
+  el<HTMLSpanElement>("statusDiag").textContent = state.isCompiling
+    ? "Compilando..."
+    : state.isRunning
+      ? "Executando..."
+      : `${errs} erro(s) · ${warns} aviso(s)`;
 
   const profile =
     COMPILER_PROFILES.find((p) => p.id === state.selectedProfileId) ??
@@ -917,6 +1183,11 @@ function applyTypography(): void {
 
 function getPaletteCommands(): PaletteCommand[] {
   const base: PaletteCommand[] = [
+    { cat: "Build", label: "Compile & Run (Compilar e Executar)", kbd: "F11", run: () => { void compileActiveFile(true); } },
+    { cat: "Build", label: "Compile (Compilar com gcc/g++)", kbd: "F9", run: () => { void compileActiveFile(false); } },
+    { cat: "Build", label: "Run (Executar último executável)", kbd: "F10", run: () => { void runCurrentProgram(); } },
+    { cat: "Build", label: "Parar Programa em Execução", kbd: "F6", run: () => { void stopExecution(); } },
+    { cat: "AStyle", label: "Formatar Código Atual com AStyle.exe", kbd: "Ctrl+Shift+A", run: () => { void formatActiveWithAStyle(); } },
     { cat: "Arquivo", label: "Salvar Arquivo Atual", kbd: "Ctrl+S", run: () => { void saveActiveTab(false); } },
     { cat: "Arquivo", label: "Salvar Como...", kbd: "Ctrl+Shift+S", run: () => { void saveActiveTab(true); } },
     { cat: "Arquivo", label: "Abrir Pasta de Projeto", kbd: "Ctrl+Shift+O", run: () => { void handleOpenFolder(); } },
@@ -926,9 +1197,6 @@ function getPaletteCommands(): PaletteCommand[] {
     { cat: "Editor", label: "Autocomplete C", kbd: "Ctrl+Space", run: () => primaryEditor.triggerAutocomplete() },
     { cat: "Editor", label: "Alternar Split View", kbd: "Ctrl+\\", run: () => { state.splitOpen = !state.splitOpen; syncSecondaryEditor(); } },
     { cat: "Editor", label: "Alternar Breakpoint na Linha Atual", kbd: "F4", run: () => primaryEditor.toggleBreakpointAtCurrentLine() },
-    { cat: "Build", label: "Compilar com GCC (Entrega 2)", kbd: "F9", run: () => { void triggerPlannedAction("compile"); } },
-    { cat: "Build", label: "Compile & Run (Entrega 2)", kbd: "F11", run: () => { void triggerPlannedAction("run"); } },
-    { cat: "AStyle", label: "Formatar com AStyle (Entrega 2)", kbd: "Ctrl+Shift+A", run: () => { void triggerPlannedAction("astyle"); } },
     { cat: "Tema", label: "Alternar Tema Dark / Daylight Paper", kbd: "", run: () => applyTheme(state.settings.theme === "dark" ? "light" : "dark") },
     { cat: "View", label: "Alternar Painel Inferior", kbd: "Ctrl+`", run: () => { state.drawerOpen = !state.drawerOpen; renderDrawer(); } },
     { cat: "Config", label: "Configurações & Toolchain", kbd: "Ctrl+,", run: () => openModal("settingsModal") },
@@ -1027,7 +1295,6 @@ function initSplitters(): void {
 }
 
 function bindEvents(): void {
-  // Compiler profiles dropdown
   const compSel = el<HTMLSelectElement>("compilerSelect");
   compSel.innerHTML = COMPILER_PROFILES.map(
     (p) => `<option value="${p.id}">${escapeHtml(p.label)}</option>`
@@ -1041,12 +1308,25 @@ function bindEvents(): void {
   el<HTMLButtonElement>("btnBrand").addEventListener("click", () => openModal("settingsModal"));
   el<HTMLButtonElement>("btnOpenFolder").addEventListener("click", () => { void handleOpenFolder(); });
   el<HTMLButtonElement>("btnOpenFile").addEventListener("click", () => { void handleOpenFile(); });
-  el<HTMLButtonElement>("btnSave").addEventListener("click", () => { void saveActiveTab(false); });
+  el<HTMLButtonElement>("btnSave").addEventListener("click", () => {
+    void saveActiveTab(false).then((ok) => {
+      if (ok) toast("Arquivo salvo.");
+    });
+  });
   el<HTMLButtonElement>("btnTemplates").addEventListener("click", () => openModal("templateModal"));
-  el<HTMLButtonElement>("btnCompile").addEventListener("click", () => { void triggerPlannedAction("compile"); });
-  el<HTMLButtonElement>("btnCompileRun").addEventListener("click", () => { void triggerPlannedAction("run"); });
-  el<HTMLButtonElement>("btnDebug").addEventListener("click", () => { void triggerPlannedAction("debug"); });
-  el<HTMLButtonElement>("btnAStyle").addEventListener("click", () => { void triggerPlannedAction("astyle"); });
+  el<HTMLButtonElement>("btnCompile").addEventListener("click", () => { void compileActiveFile(false); });
+  el<HTMLButtonElement>("btnRunOnly").addEventListener("click", () => { void runCurrentProgram(); });
+  el<HTMLButtonElement>("btnCompileRun").addEventListener("click", () => { void compileActiveFile(true); });
+  el<HTMLButtonElement>("btnStopRun").addEventListener("click", () => { void stopExecution(); });
+  el<HTMLButtonElement>("btnStopDrawer").addEventListener("click", () => { void stopExecution(); });
+  el<HTMLButtonElement>("btnAStyle").addEventListener("click", () => { void formatActiveWithAStyle(); });
+  el<HTMLButtonElement>("btnDebug").addEventListener("click", () => {
+    state.sidebarOpen = true;
+    state.sidebarPanel = "debug";
+    renderSidebar();
+    toast("Depurador GDB/MI + Memória SVG ao vivo entra na Entrega 3!");
+  });
+
   el<HTMLButtonElement>("btnPalette").addEventListener("click", openPalette);
   el<HTMLButtonElement>("btnSplit").addEventListener("click", () => {
     state.splitOpen = !state.splitOpen;
@@ -1059,9 +1339,14 @@ function bindEvents(): void {
   });
   el<HTMLButtonElement>("btnSettings").addEventListener("click", () => openModal("settingsModal"));
   el<HTMLSpanElement>("statusToolchainBtn").addEventListener("click", () => openModal("settingsModal"));
+  el<HTMLSpanElement>("statusDiag").addEventListener("click", () => {
+    state.drawerOpen = true;
+    state.drawerTab = "problems";
+    renderDrawer();
+  });
   el<HTMLButtonElement>("btnRefreshToolchain").addEventListener("click", () => { void loadToolchain(); });
 
-  // Editor bar buttons
+  // Editor bar
   el<HTMLButtonElement>("btnInlineFind").addEventListener("click", () => primaryEditor.openFind());
   el<HTMLButtonElement>("btnComplete").addEventListener("click", () => primaryEditor.triggerAutocomplete());
   el<HTMLSpanElement>("crumbSymbol").addEventListener("click", () => {
@@ -1097,12 +1382,37 @@ function bindEvents(): void {
     renderDrawer();
   });
 
-  // Drawer tabs
+  // Drawer controls & tabs
+  el<HTMLInputElement>("chkConsolePauser").addEventListener("change", (e) => {
+    state.useConsolePauser = (e.target as HTMLInputElement).checked;
+  });
+  el<HTMLButtonElement>("btnClearTerminal").addEventListener("click", () => {
+    state.terminalChunks = [];
+    renderDrawer();
+  });
   document.querySelectorAll<HTMLButtonElement>(".drawer-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.drawerTab = btn.dataset.dtab as DrawerTab;
       renderDrawer();
     });
+  });
+
+  // Diagnostic card clicks
+  el<HTMLDivElement>("drawerBody").addEventListener("click", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>("[data-diag-idx]");
+    if (card?.dataset.diagIdx !== undefined) {
+      const diag = state.diagnostics[Number(card.dataset.diagIdx)];
+      if (diag) void jumpToDiagnostic(diag);
+    }
+  });
+
+  // Interactive stdin form
+  el<HTMLFormElement>("stdinBar").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = el<HTMLInputElement>("stdinInput");
+    const val = input.value;
+    input.value = "";
+    void handleSendStdin(val);
   });
 
   // Tabs delegation
@@ -1161,7 +1471,7 @@ function bindEvents(): void {
     }
   });
 
-  // Templates modal delegation
+  // Templates modal
   el<HTMLDivElement>("tplGrid").addEventListener("click", (e) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>("[data-tpl-idx]");
     if (card?.dataset.tplIdx !== undefined) {
@@ -1173,7 +1483,7 @@ function bindEvents(): void {
     void handleCreateFromTemplate();
   });
 
-  // Settings controls
+  // Settings
   el<HTMLSelectElement>("setTheme").addEventListener("change", (e) => {
     applyTheme((e.target as HTMLSelectElement).value as ThemeMode);
   });
@@ -1194,7 +1504,7 @@ function bindEvents(): void {
     renderStatus();
   });
 
-  // Modal backdrops & close buttons
+  // Modals
   document.querySelectorAll<HTMLElement>(".modal-backdrop").forEach((backdrop) => {
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) backdrop.classList.remove("open");
@@ -1206,7 +1516,6 @@ function bindEvents(): void {
     });
   });
 
-  // Command palette input & list
   el<HTMLInputElement>("paletteInput").addEventListener("input", renderPaletteList);
   el<HTMLDivElement>("paletteList").addEventListener("click", (e) => {
     const item = (e.target as HTMLElement).closest<HTMLElement>("[data-pal-idx]");
@@ -1266,7 +1575,9 @@ function bindEvents(): void {
       void saveActiveTab(true);
     } else if (ctrl && key === "s") {
       e.preventDefault();
-      void saveActiveTab(false);
+      void saveActiveTab(false).then((ok) => {
+        if (ok) toast("Arquivo salvo.");
+      });
     } else if (ctrl && e.shiftKey && key === "o") {
       e.preventDefault();
       void handleOpenFolder();
@@ -1298,20 +1609,53 @@ function bindEvents(): void {
       openModal("settingsModal");
     } else if (ctrl && e.shiftKey && key === "a") {
       e.preventDefault();
-      void triggerPlannedAction("astyle");
+      void formatActiveWithAStyle();
     } else if (e.key === "F4") {
       e.preventDefault();
       primaryEditor.toggleBreakpointAtCurrentLine();
     } else if (e.key === "F9") {
       e.preventDefault();
-      void triggerPlannedAction("compile");
+      void compileActiveFile(false);
+    } else if (e.key === "F10") {
+      e.preventDefault();
+      void runCurrentProgram();
     } else if (e.key === "F11") {
       e.preventDefault();
-      void triggerPlannedAction("run");
+      void compileActiveFile(true);
+    } else if (e.key === "F6" && state.isRunning) {
+      e.preventDefault();
+      void stopExecution();
     } else if (e.key === "F5") {
       e.preventDefault();
-      void triggerPlannedAction("debug");
+      state.sidebarOpen = true;
+      state.sidebarPanel = "debug";
+      renderSidebar();
+      toast("Depurador GDB/MI + Memória SVG ao vivo entra na Entrega 3!");
     }
+  });
+}
+
+async function subscribeRunnerEvents(): Promise<void> {
+  await onRunnerOutput((ev) => {
+    const cls =
+      ev.stream === "stderr"
+        ? "term-err"
+        : ev.stream === "system"
+          ? "term-muted"
+          : "";
+    appendTerminalChunk(ev.text, cls);
+  });
+
+  await onRunnerExit((ev) => {
+    if (state.activeRunId !== null && ev.run_id !== state.activeRunId) return;
+    state.isRunning = false;
+    state.activeRunId = null;
+    const summary = ev.killed
+      ? `\n■ Execução interrompida pelo usuário após ${(ev.duration_ms / 1000).toFixed(2)}s.\n`
+      : `\n-------------------------------------------\nProcesso encerrado em ${(ev.duration_ms / 1000).toFixed(3)}s · código de retorno ${ev.exit_code ?? -1}\n`;
+    appendTerminalChunk(summary, ev.killed || ev.exit_code !== 0 ? "term-warn" : "term-ok");
+    syncRunControls();
+    renderStatus();
   });
 }
 
@@ -1361,6 +1705,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initSplitters();
   bindEvents();
 
+  void subscribeRunnerEvents();
   void loadToolchain();
   void openRoteiroWorkspace();
 });

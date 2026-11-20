@@ -44,6 +44,43 @@ export interface SearchMatch {
   snippet: string;
 }
 
+export interface CompileDiagnostic {
+  file: string;
+  line: number;
+  column: number;
+  severity: "error" | "warning" | "note";
+  message: string;
+  hint: string | null;
+}
+
+export interface CompileResult {
+  success: boolean;
+  command_line: string;
+  executable_path: string;
+  duration_ms: number;
+  raw_output: string;
+  diagnostics: CompileDiagnostic[];
+}
+
+export interface FormatResult {
+  formatted_code: string;
+  changed: boolean;
+  command_summary: string;
+}
+
+export interface RunnerOutputEvent {
+  run_id: number;
+  stream: "stdout" | "stderr" | "system";
+  text: string;
+}
+
+export interface RunnerExitEvent {
+  run_id: number;
+  exit_code: number | null;
+  duration_ms: number;
+  killed: boolean;
+}
+
 export interface OpenTab {
   path: string;
   name: string;

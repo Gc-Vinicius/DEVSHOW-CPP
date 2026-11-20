@@ -95,7 +95,7 @@
             class="btn btn-subtle"
             id="btnCompile"
             type="button"
-            title="Compilar (F9 — integração real gcc.exe na Entrega 2)"
+            title="Compilar com gcc/g++ (F9)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path
@@ -107,16 +107,42 @@
           </button>
 
           <button
+            class="btn btn-subtle"
+            id="btnRunOnly"
+            type="button"
+            title="Executar binário compilado (F10)"
+          >
+            <svg class="ico ico-sm" viewBox="0 0 24 24">
+              <polygon points="6 3 20 12 6 21 6 3" />
+            </svg>
+            <span>Run</span>
+            <span class="kbd">F10</span>
+          </button>
+
+          <button
             class="btn btn-primary"
             id="btnCompileRun"
             type="button"
-            title="Compilar & Executar (F11 — execução real na Entrega 2)"
+            title="Compilar e Executar (F11)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <polygon points="6 3 20 12 6 21 6 3" />
             </svg>
             <span>Compile &amp; Run</span>
             <span class="kbd">F11</span>
+          </button>
+
+          <button
+            class="btn btn-danger hidden"
+            id="btnStopRun"
+            type="button"
+            title="Interromper programa em execução (F6)"
+          >
+            <svg class="ico ico-sm" viewBox="0 0 24 24">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+            <span>Parar</span>
+            <span class="kbd">F6</span>
           </button>
 
           <button
@@ -138,7 +164,7 @@
             class="btn btn-subtle"
             id="btnAStyle"
             type="button"
-            title="Formatar com AStyle.exe (Ctrl+Shift+A — Entrega 2)"
+            title="Formatar código com AStyle.exe local (Ctrl+Shift+A)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path d="M21 6H3M17 12H3M19 18H3" />
@@ -389,17 +415,56 @@
                   <span>Compile Log</span>
                 </button>
               </div>
-              <button
-                class="btn btn-ghost btn-icon"
-                id="btnCloseDrawer"
-                type="button"
-                style="height: 24px; width: 24px"
-                title="Fechar painel (Ctrl+`)"
-              >
-                ✕
-              </button>
+              <div class="drawer-controls">
+                <label
+                  class="pauser-toggle"
+                  title="Executar em janela de console externa usando ConsolePauser.exe"
+                >
+                  <input type="checkbox" id="chkConsolePauser" />
+                  <span>ConsolePauser.exe</span>
+                </label>
+                <button
+                  class="btn btn-ghost"
+                  id="btnClearTerminal"
+                  type="button"
+                  style="height: 24px; font-size: 11px; padding: 0 7px"
+                  title="Limpar saída do terminal"
+                >
+                  Limpar
+                </button>
+                <button
+                  class="btn btn-ghost btn-icon"
+                  id="btnCloseDrawer"
+                  type="button"
+                  style="height: 24px; width: 24px"
+                  title="Fechar painel (Ctrl+`)"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div class="drawer-body" id="drawerBody"></div>
+            <form class="stdin-bar hidden" id="stdinBar">
+              <span class="stdin-prompt">stdin ❯</span>
+              <input
+                type="text"
+                id="stdinInput"
+                class="stdin-input"
+                placeholder="Digite a entrada para scanf/fgets e pressione Enter..."
+                autocomplete="off"
+              />
+              <button class="btn btn-subtle" type="submit" style="height: 24px; font-size: 11px">
+                Enviar
+              </button>
+              <button
+                class="btn btn-danger"
+                id="btnStopDrawer"
+                type="button"
+                style="height: 24px; font-size: 11px"
+              >
+                Parar
+              </button>
+            </form>
           </section>
         </main>
       </div>
@@ -414,6 +479,9 @@
           >
             <span class="status-dot" id="statusDot"></span>
             <span id="statusToolchain">Detectando toolchain...</span>
+          </span>
+          <span class="status-item" id="statusDiag" title="Abrir aba Problemas GCC">
+            0 erros · 0 avisos
           </span>
           <span class="status-item" id="statusWorkspacePath">Workspace: —</span>
         </div>

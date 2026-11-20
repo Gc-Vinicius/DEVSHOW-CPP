@@ -3,44 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DEVSHOW C++ — IDE Moderna C-First</title>
+    <title>DEVSHOW C++</title>
     <link rel="stylesheet" href="/src/styles.css" />
     <script type="module" src="/src/main.ts" defer></script>
   </head>
   <body>
     <div class="ide-shell">
-      <!-- UNIFIED COMPACT HEADER BAR (46px) -->
+      <!-- HEADER BAR UNIFICADA (44px) -->
       <header class="header-bar">
         <div class="header-left">
           <button
             class="brand-pill"
             id="btnBrand"
             type="button"
-            title="DEVSHOW C++ · Ver status do toolchain local"
+            title="DEVSHOW C++ — Ver status do compilador local"
           >
-            <span class="brand-logo">C</span>
-            <span>DEVSHOW</span>
+            <span class="brand-logo" aria-hidden="true">C</span>
+            <span class="brand-name">DEVSHOW</span>
             <span class="brand-badge">C11</span>
           </button>
-          <div class="divider-v"></div>
+          <div class="divider-v" aria-hidden="true"></div>
           <button
             class="btn btn-ghost"
             id="btnOpenFolder"
             type="button"
-            title="Abrir Pasta de Projeto (Ctrl+Shift+O)"
+            title="Abrir pasta (Ctrl+Shift+O)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path
                 d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
               />
             </svg>
-            <span>Pasta</span>
+            <span class="btn-label">Pasta</span>
           </button>
           <button
             class="btn btn-ghost"
             id="btnOpenFile"
             type="button"
-            title="Abrir Arquivo .c/.h (Ctrl+O)"
+            title="Abrir arquivo .c ou .h (Ctrl+O)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path
@@ -48,13 +48,13 @@
               />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            <span>Abrir</span>
+            <span class="btn-label">Abrir</span>
           </button>
           <button
             class="btn btn-ghost"
             id="btnSave"
             type="button"
-            title="Salvar Arquivo Atual (Ctrl+S)"
+            title="Salvar arquivo atual (Ctrl+S)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path
@@ -63,74 +63,71 @@
               <polyline points="17 21 17 13 7 13 7 21" />
               <polyline points="7 3 7 8 15 8" />
             </svg>
-            <span>Salvar</span>
+            <span class="btn-label">Salvar</span>
           </button>
           <button
             class="btn btn-ghost"
             id="btnTemplates"
             type="button"
-            title="Novo Arquivo a partir de Template C (Ctrl+Shift+N)"
+            title="Novo arquivo a partir de template C (Ctrl+Shift+N)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            <span>Templates C</span>
+            <span class="btn-label">Novo</span>
           </button>
         </div>
 
-        <!-- COMPILER & BUILD CLUSTER -->
+        <!-- CONTROLE SEGMENTADO DE COMPILAÇÃO E EXECUÇÃO -->
         <div class="header-center">
           <div
             class="compiler-select-wrap"
             title="Perfil de compilação TDM-GCC / MinGW64"
           >
-            <svg class="ico ico-sm" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-              <path d="M9 9h6v6H9z" />
-            </svg>
-            <select id="compilerSelect" class="compiler-select"></select>
+            <select
+              id="compilerSelect"
+              class="compiler-select"
+              aria-label="Perfil do compilador"
+            ></select>
           </div>
 
-          <button
-            class="btn btn-subtle"
-            id="btnCompile"
-            type="button"
-            title="Compilar com gcc/g++ (F9)"
-          >
-            <svg class="ico ico-sm" viewBox="0 0 24 24">
-              <path
-                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-              />
-            </svg>
-            <span>Compile</span>
-            <span class="kbd">F9</span>
-          </button>
-
-          <button
-            class="btn btn-subtle"
-            id="btnRunOnly"
-            type="button"
-            title="Executar binário compilado (F10)"
-          >
-            <svg class="ico ico-sm" viewBox="0 0 24 24">
-              <polygon points="6 3 20 12 6 21 6 3" />
-            </svg>
-            <span>Run</span>
-            <span class="kbd">F10</span>
-          </button>
-
-          <button
-            class="btn btn-primary"
-            id="btnCompileRun"
-            type="button"
-            title="Compilar e Executar (F11)"
-          >
-            <svg class="ico ico-sm" viewBox="0 0 24 24">
-              <polygon points="6 3 20 12 6 21 6 3" />
-            </svg>
-            <span>Compile &amp; Run</span>
-            <span class="kbd">F11</span>
-          </button>
+          <div class="build-segmented" role="group" aria-label="Compilação e execução">
+            <button
+              class="btn btn-seg"
+              id="btnCompile"
+              type="button"
+              title="Compilar (F9)"
+            >
+              <svg class="ico ico-sm" viewBox="0 0 24 24">
+                <path
+                  d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+                />
+              </svg>
+              <span class="btn-label-lg">Compilar</span>
+            </button>
+            <button
+              class="btn btn-seg"
+              id="btnRunOnly"
+              type="button"
+              title="Executar binário compilado (F10)"
+            >
+              <svg class="ico ico-sm" viewBox="0 0 24 24">
+                <polygon points="6 3 20 12 6 21 6 3" />
+              </svg>
+              <span class="btn-label-lg">Executar</span>
+            </button>
+            <button
+              class="btn btn-primary btn-seg-hero"
+              id="btnCompileRun"
+              type="button"
+              title="Compilar e executar (F11)"
+            >
+              <svg class="ico ico-sm" viewBox="0 0 24 24">
+                <polygon points="6 3 20 12 6 21 6 3" />
+              </svg>
+              <span>Compilar e executar</span>
+            </button>
+          </div>
 
           <button
             class="btn btn-danger hidden"
@@ -142,57 +139,56 @@
               <rect x="5" y="5" width="14" height="14" rx="2" />
             </svg>
             <span>Parar</span>
-            <span class="kbd">F6</span>
           </button>
 
           <button
-            class="btn btn-debug"
+            class="btn btn-subtle"
             id="btnDebug"
             type="button"
-            title="Depurar com GDB + Memória SVG (F5 — Entrega 3)"
+            title="Depurar passo a passo com GDB e visualizador de memória (F5)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <rect x="3" y="4" width="7" height="7" rx="1" />
               <rect x="14" y="13" width="7" height="7" rx="1" />
               <path d="M10 7.5h4a2 2 0 0 1 2 2V13" />
             </svg>
-            <span>Debug</span>
-            <span class="kbd">F5</span>
+            <span class="btn-label">Depurar</span>
           </button>
 
           <button
-            class="btn btn-subtle"
+            class="btn btn-ghost"
             id="btnAStyle"
             type="button"
-            title="Formatar código com AStyle.exe local (Ctrl+Shift+A)"
+            title="Formatar código com AStyle (Ctrl+Shift+A)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <path d="M21 6H3M17 12H3M19 18H3" />
             </svg>
-            <span>AStyle</span>
+            <span class="btn-label-lg">Formatar</span>
           </button>
         </div>
 
-        <!-- UTILITIES -->
+        <!-- UTILITÁRIOS -->
         <div class="header-right">
           <button
             class="cmd-trigger"
             id="btnPalette"
             type="button"
-            title="Paleta de Comandos (Ctrl+K)"
+            title="Abrir paleta de comandos (Ctrl+K)"
           >
             <svg class="ico ico-sm" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
-            <span>Comandos...</span>
+            <span class="btn-label">Comandos</span>
             <span class="kbd">Ctrl+K</span>
           </button>
           <button
             class="btn btn-ghost btn-icon"
             id="btnSplit"
             type="button"
-            title="Editor Dividido / Split View (Ctrl+\)"
+            title="Dividir editor lado a lado (Ctrl+\)"
+            aria-label="Dividir editor"
           >
             <svg class="ico" viewBox="0 0 24 24">
               <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -203,7 +199,8 @@
             class="btn btn-ghost btn-icon"
             id="btnTheme"
             type="button"
-            title="Alternar Tema Dark / Daylight Paper"
+            title="Alternar tema escuro e claro"
+            aria-label="Alternar tema"
           >
             <svg class="ico" id="themeIcon" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="4" />
@@ -216,7 +213,8 @@
             class="btn btn-ghost btn-icon"
             id="btnSettings"
             type="button"
-            title="Configurações & Toolchain (Ctrl+,)"
+            title="Configurações e compilador (Ctrl+,)"
+            aria-label="Configurações"
           >
             <svg class="ico" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="3" />
@@ -228,16 +226,16 @@
         </div>
       </header>
 
-      <!-- WORKSPACE -->
+      <!-- ÁREA PRINCIPAL -->
       <div class="workspace">
-        <!-- ACTIVITY RAIL (46px) -->
-        <nav class="activity-rail" aria-label="Navegação Lateral">
+        <nav class="activity-rail" aria-label="Painéis laterais">
           <div class="rail-group">
             <button
               class="rail-btn active"
               data-panel="roteiro"
               type="button"
-              title="Roteiro C · 2º Semestre (7 arquivos reais)"
+              title="Roteiro de C (7 exercícios)"
+              aria-label="Roteiro de C"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <path
@@ -249,7 +247,8 @@
               class="rail-btn"
               data-panel="files"
               type="button"
-              title="Arquivos do Workspace (.c / .h)"
+              title="Arquivos da pasta"
+              aria-label="Arquivos"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <path
@@ -261,7 +260,8 @@
               class="rail-btn"
               data-panel="outline"
               type="button"
-              title="Funções e Structs do Arquivo Atual"
+              title="Funções e structs"
+              aria-label="Funções e structs"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <path
@@ -273,7 +273,8 @@
               class="rail-btn"
               data-panel="search"
               type="button"
-              title="Buscar em Todos os Arquivos do Workspace (Ctrl+Shift+F)"
+              title="Buscar nos arquivos (Ctrl+Shift+F)"
+              aria-label="Buscar"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8" />
@@ -285,7 +286,8 @@
               id="railDebugBtn"
               data-panel="debug"
               type="button"
-              title="Memória, Ponteiros & Breakpoints"
+              title="Memória, ponteiros e pontos de parada"
+              aria-label="Depuração e memória"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <rect x="3" y="4" width="7" height="7" rx="1" />
@@ -300,7 +302,8 @@
               class="rail-btn"
               id="btnToggleDrawerRail"
               type="button"
-              title="Alternar Painel Inferior (Ctrl+`)"
+              title="Mostrar ou ocultar painel inferior (Ctrl+`)"
+              aria-label="Alternar painel inferior"
             >
               <svg class="ico" viewBox="0 0 24 24">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -310,16 +313,17 @@
           </div>
         </nav>
 
-        <!-- COLLAPSIBLE SIDEBAR -->
+        <!-- BARRA LATERAL -->
         <aside class="sidebar" id="sidebar">
           <div class="sidebar-header">
-            <span id="sidebarTitle">Roteiro C · 2º Semestre</span>
+            <span id="sidebarTitle">Roteiro de C</span>
             <button
               class="btn btn-ghost btn-icon"
               id="btnCollapseSidebar"
               type="button"
               style="height: 24px; width: 24px"
-              title="Recolher Barra Lateral"
+              title="Recolher barra lateral"
+              aria-label="Recolher barra lateral"
             >
               <svg class="ico ico-sm" viewBox="0 0 24 24">
                 <path d="m15 18-6-6 6-6" />
@@ -335,10 +339,9 @@
           title="Arraste para redimensionar"
         ></div>
 
-        <!-- CENTER COLUMN -->
+        <!-- COLUNA CENTRAL -->
         <main class="center-column">
           <section class="editor-region">
-            <!-- Single-Line Tabs -->
             <div class="tab-bar">
               <div class="tab-list" id="tabList"></div>
               <div class="tab-actions">
@@ -347,92 +350,135 @@
                   id="btnInlineFind"
                   type="button"
                   style="height: 26px; font-size: 11.5px"
-                  title="Localizar / Substituir (Ctrl+F)"
+                  title="Localizar e substituir no arquivo (Ctrl+F)"
                 >
                   <svg class="ico ico-sm" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.3-4.3" />
                   </svg>
-                  <span>Find</span>
+                  <span>Localizar</span>
                 </button>
                 <button
                   class="btn btn-ghost"
                   id="btnComplete"
                   type="button"
                   style="height: 26px; font-size: 11.5px"
-                  title="Autocomplete C (Ctrl+Space)"
+                  title="Mostrar sugestões de código C (Ctrl+Space)"
                 >
-                  <span>Complete</span>
+                  <span>Sugestões</span>
                 </button>
               </div>
             </div>
 
-            <!-- Breadcrumb Bar -->
             <div class="breadcrumb-bar">
               <div class="breadcrumb-path">
                 <span id="crumbWorkspace">DEVSHOW-C-Roteiro</span>
-                <span class="breadcrumb-sep">›</span>
+                <span class="breadcrumb-sep">/</span>
                 <span id="crumbFile">04_ponteiros.c</span>
-                <span class="breadcrumb-sep">›</span>
-                <span class="breadcrumb-sym" id="crumbSymbol">main()</span>
+                <span class="breadcrumb-sep">/</span>
+                <button
+                  class="breadcrumb-sym"
+                  id="crumbSymbol"
+                  type="button"
+                  title="Abrir lista de funções e structs"
+                >
+                  main()
+                </button>
               </div>
-              <span class="block-chip" id="blockChip">C11 · Pronto</span>
+              <span class="block-chip" id="blockChip">Pronto</span>
             </div>
 
-            <!-- Floating Contextual Debug Bar (GDB/MI2) -->
+            <!-- Barra flutuante de depuração -->
             <div class="debug-floating-bar hidden" id="debugFloatingBar">
               <span class="debug-pill-label"
-                ><span class="pulse-dot"></span>GDB ATIVO</span
+                ><span class="pulse-dot"></span>GDB ativo</span
               >
               <button
                 class="btn btn-ghost"
                 id="btnDbgContinue"
                 type="button"
                 style="height: 26px; padding: 0 8px"
-                title="Continuar (F5)"
+                title="Continuar execução (F5)"
               >
-                <span>Continue <span class="kbd">F5</span></span>
+                <span>Continuar</span>
+                <span class="kbd">F5</span>
               </button>
               <button
                 class="btn btn-ghost"
                 id="btnDbgInto"
                 type="button"
                 style="height: 26px; padding: 0 8px"
-                title="Entrar na Função / Step Into (F7)"
+                title="Entrar na função (F7)"
               >
-                <span>Step Into <span class="kbd">F7</span></span>
+                <span>Entrar</span>
+                <span class="kbd">F7</span>
               </button>
               <button
                 class="btn btn-ghost"
                 id="btnDbgOver"
                 type="button"
                 style="height: 26px; padding: 0 8px"
-                title="Próxima Linha / Step Over (F8)"
+                title="Avançar próxima linha (F8)"
               >
-                <span>Step Over <span class="kbd">F8</span></span>
+                <span>Avançar</span>
+                <span class="kbd">F8</span>
               </button>
               <button
                 class="btn btn-ghost"
                 id="btnDbgOut"
                 type="button"
                 style="height: 26px; padding: 0 8px"
-                title="Sair da Função / Step Out (Shift+F8)"
+                title="Sair da função atual (Shift+F8)"
               >
-                <span>Step Out</span>
+                <span>Sair</span>
               </button>
               <button
                 class="btn btn-ghost"
                 id="btnDbgStop"
                 type="button"
                 style="height: 26px; padding: 0 8px; color: var(--error)"
-                title="Encerrar Depuração (F6)"
+                title="Encerrar depuração (F6)"
               >
-                <span>Parar <span class="kbd">F6</span></span>
+                <span>Parar</span>
+                <span class="kbd">F6</span>
               </button>
             </div>
 
-            <!-- CodeMirror 6 Mounts -->
+            <!-- Editor + Estado Vazio Acionável -->
             <div class="editor-split-wrap">
+              <div class="editor-empty-state hidden" id="editorEmptyState">
+                <div class="empty-inner">
+                  <h2>Nenhum arquivo aberto</h2>
+                  <p>
+                    Abra um arquivo <code>.c</code> do seu computador, crie um
+                    novo código a partir de um template ou retome o roteiro de
+                    estudo em C.
+                  </p>
+                  <div class="empty-actions">
+                    <button
+                      class="btn btn-primary"
+                      id="btnEmptyNewTemplate"
+                      type="button"
+                    >
+                      Novo arquivo em C
+                    </button>
+                    <button
+                      class="btn btn-subtle"
+                      id="btnEmptyOpenFile"
+                      type="button"
+                    >
+                      Abrir arquivo
+                    </button>
+                    <button
+                      class="btn btn-ghost"
+                      id="btnEmptyRoteiro"
+                      type="button"
+                    >
+                      Abrir roteiro de C
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div class="editor-pane" id="primaryEditorHost"></div>
               <div
                 class="editor-pane secondary"
@@ -447,7 +493,7 @@
             title="Arraste para redimensionar"
           ></div>
 
-          <!-- BOTTOM DRAWER -->
+          <!-- PAINEL INFERIOR -->
           <section class="bottom-drawer" id="bottomDrawer">
             <div class="drawer-header">
               <div class="drawer-tabs">
@@ -456,23 +502,23 @@
                   data-dtab="terminal"
                   type="button"
                 >
-                  <span>Terminal / Saída</span>
+                  <span>Terminal</span>
                 </button>
                 <button class="drawer-tab" data-dtab="problems" type="button">
-                  <span>Problemas GCC</span>
+                  <span>Problemas</span>
                   <span class="pill-count" id="problemsCount">0</span>
                 </button>
                 <button class="drawer-tab" data-dtab="trace" type="button">
-                  <span>Teste de Mesa (Trace)</span>
+                  <span>Teste de mesa</span>
                 </button>
                 <button class="drawer-tab" data-dtab="log" type="button">
-                  <span>Compile Log</span>
+                  <span>Log do compilador</span>
                 </button>
               </div>
               <div class="drawer-controls">
                 <label
                   class="pauser-toggle"
-                  title="Executar em janela de console externa usando ConsolePauser.exe"
+                  title="Executar em janela externa usando ConsolePauser.exe"
                 >
                   <input type="checkbox" id="chkConsolePauser" />
                   <span>ConsolePauser.exe</span>
@@ -481,7 +527,7 @@
                   class="btn btn-ghost"
                   id="btnClearTerminal"
                   type="button"
-                  style="height: 24px; font-size: 11px; padding: 0 7px"
+                  style="height: 24px; font-size: 11.5px; padding: 0 7px"
                   title="Limpar saída do terminal"
                 >
                   Limpar
@@ -491,7 +537,8 @@
                   id="btnCloseDrawer"
                   type="button"
                   style="height: 24px; width: 24px"
-                  title="Fechar painel (Ctrl+`)"
+                  title="Ocultar painel inferior (Ctrl+`)"
+                  aria-label="Ocultar painel inferior"
                 >
                   ✕
                 </button>
@@ -499,22 +546,26 @@
             </div>
             <div class="drawer-body" id="drawerBody"></div>
             <form class="stdin-bar hidden" id="stdinBar">
-              <span class="stdin-prompt">stdin ❯</span>
+              <span class="stdin-prompt">stdin</span>
               <input
                 type="text"
                 id="stdinInput"
                 class="stdin-input"
-                placeholder="Digite a entrada para scanf/fgets e pressione Enter..."
+                placeholder="Digite a entrada para scanf/fgets e pressione Enter"
                 autocomplete="off"
               />
-              <button class="btn btn-subtle" type="submit" style="height: 24px; font-size: 11px">
+              <button
+                class="btn btn-subtle"
+                type="submit"
+                style="height: 24px; font-size: 11.5px"
+              >
                 Enviar
               </button>
               <button
                 class="btn btn-danger"
                 id="btnStopDrawer"
                 type="button"
-                style="height: 24px; font-size: 11px"
+                style="height: 24px; font-size: 11.5px"
               >
                 Parar
               </button>
@@ -523,33 +574,47 @@
         </main>
       </div>
 
-      <!-- STATUS BAR (26px) -->
+      <!-- BARRA DE STATUS (26px) -->
       <footer class="status-bar">
         <div class="status-group">
-          <span
+          <button
             class="status-item"
             id="statusToolchainBtn"
-            title="Clique para inspecionar o toolchain local"
+            type="button"
+            title="Ver status e caminho do compilador local"
           >
             <span class="status-dot" id="statusDot"></span>
-            <span id="statusToolchain">Detectando toolchain...</span>
-          </span>
-          <span class="status-item" id="statusDiag" title="Abrir aba Problemas GCC">
-            0 erros · 0 avisos
-          </span>
-          <span class="status-item" id="statusWorkspacePath">Workspace: —</span>
+            <span id="statusToolchain">Verificando compilador...</span>
+          </button>
+          <button
+            class="status-item"
+            id="statusDiag"
+            type="button"
+            title="Abrir painel de problemas"
+          >
+            0 erros, 0 avisos
+          </button>
+          <span class="status-item status-static" id="statusWorkspacePath"
+            >Nenhuma pasta aberta</span
+          >
         </div>
         <div class="status-group">
-          <span class="status-item" id="statusCursor">Ln 1, Col 1</span>
-          <span class="status-item" id="statusLang">C11</span>
-          <span class="status-item">UTF-8</span>
-          <span class="status-item" id="statusAStyle">AStyle (-A3 K&amp;R)</span>
-          <span class="status-item" id="statusKeymap">Keymap: Híbrido</span>
+          <span class="status-item status-static" id="statusCursor"
+            >Ln 1, Col 1</span
+          >
+          <span class="status-item status-static" id="statusLang">C11</span>
+          <span class="status-item status-static">UTF-8</span>
+          <span class="status-item status-static" id="statusAStyle"
+            >AStyle (-A3 K&amp;R)</span
+          >
+          <span class="status-item status-static" id="statusKeymap"
+            >Atalhos: híbrido</span
+          >
         </div>
       </footer>
     </div>
 
-    <!-- COMMAND PALETTE (Ctrl+K) -->
+    <!-- PALETA DE COMANDOS (Ctrl+K) -->
     <div class="modal-backdrop" id="paletteModal">
       <div class="modal-card palette">
         <div class="palette-input-wrap">
@@ -560,7 +625,7 @@
           <input
             class="palette-input"
             id="paletteInput"
-            placeholder="Digite um comando, template ou arquivo do roteiro C..."
+            placeholder="Digite um comando, template ou exercício do roteiro"
           />
           <span class="kbd">ESC</span>
         </div>
@@ -568,15 +633,16 @@
       </div>
     </div>
 
-    <!-- TEMPLATES C MODAL -->
+    <!-- MODAL DE TEMPLATES C -->
     <div class="modal-backdrop" id="templateModal">
       <div class="modal-card wide">
         <div class="modal-header">
-          <span class="modal-title">Novo Arquivo C a partir de Template</span>
+          <span class="modal-title">Novo arquivo a partir de template C</span>
           <button
             class="btn btn-ghost btn-icon"
             data-close-modal="templateModal"
             type="button"
+            aria-label="Fechar"
           >
             ✕
           </button>
@@ -604,21 +670,22 @@
             Cancelar
           </button>
           <button class="btn btn-primary" id="btnCreateTemplate" type="button">
-            Criar e Abrir no Editor
+            Criar e abrir
           </button>
         </div>
       </div>
     </div>
 
-    <!-- SETTINGS & TOOLCHAIN MODAL -->
+    <!-- MODAL DE CONFIGURAÇÕES E COMPILADOR -->
     <div class="modal-backdrop" id="settingsModal">
       <div class="modal-card">
         <div class="modal-header">
-          <span class="modal-title">Configurações &amp; Toolchain Local</span>
+          <span class="modal-title">Configurações e compilador</span>
           <button
             class="btn btn-ghost btn-icon"
             data-close-modal="settingsModal"
             type="button"
+            aria-label="Fechar"
           >
             ✕
           </button>
@@ -626,19 +693,19 @@
         <div class="modal-body">
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Tema da Interface</strong>
-              <span>Obsidian Slate (Dark) ou Daylight Paper (Light).</span>
+              <strong>Tema da interface</strong>
+              <span>Grafite escuro ou papel claro de alto contraste.</span>
             </div>
             <div class="setting-control">
               <select id="setTheme">
-                <option value="dark">Obsidian Slate (Dark)</option>
-                <option value="light">Daylight Paper (Light)</option>
+                <option value="dark">Grafite (escuro)</option>
+                <option value="light">Papel (claro)</option>
               </select>
             </div>
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Fonte do Editor (CodeMirror 6)</strong>
+              <strong>Fonte do editor</strong>
               <span>Monoespaçadas nítidas para operadores C (*p, &amp;x, -&gt;).</span>
             </div>
             <div class="setting-control">
@@ -658,38 +725,38 @@
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Tamanho da Fonte</strong>
+              <strong>Tamanho da fonte</strong>
               <span>Ajuste para estudo individual ou projeção em aula.</span>
             </div>
             <div class="setting-control">
               <select id="setFontSize">
                 <option value="13">13 px</option>
-                <option value="14" selected>14 px (Padrão)</option>
-                <option value="16">16 px (Modo Aula)</option>
-                <option value="18">18 px (Grande)</option>
+                <option value="14" selected>14 px (padrão)</option>
+                <option value="16">16 px (modo aula)</option>
+                <option value="18">18 px (grande)</option>
               </select>
             </div>
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Tamanho da Tabulação</strong>
+              <strong>Tamanho da tabulação</strong>
               <span>Espaços por nível de indentação no editor e no AStyle.</span>
             </div>
             <div class="setting-control">
               <select id="setTabSize">
                 <option value="2">2 espaços</option>
-                <option value="4" selected>4 espaços (Padrão)</option>
+                <option value="4" selected>4 espaços (padrão)</option>
               </select>
             </div>
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Estilo AStyle</strong>
-              <span>Preset para formatação C (AStyle.exe).</span>
+              <strong>Estilo de formatação AStyle</strong>
+              <span>Preset aplicado ao formatar arquivos C/C++.</span>
             </div>
             <div class="setting-control">
               <select id="setAStyle">
-                <option value="-A3" selected>K&amp;R (-A3 · C clássico)</option>
+                <option value="-A3" selected>K&amp;R (-A3, C clássico)</option>
                 <option value="-A2">Java / Attached (-A2)</option>
                 <option value="-A1">Allman / BSD (-A1)</option>
               </select>
@@ -697,34 +764,34 @@
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <strong>Perfil de Atalhos</strong>
-              <span>Preserva F5/F9/F11 do Dev-C++ com atalhos modernos.</span>
+              <strong>Perfil de atalhos</strong>
+              <span>Preserva F5, F9 e F11 do Dev-C++ com comandos modernos.</span>
             </div>
             <div class="setting-control">
               <select id="setKeymap">
-                <option value="hybrid">Híbrido (F9/F11 + Ctrl+K)</option>
-                <option value="classic">Dev-C++ 5.11 Clássico</option>
+                <option value="hybrid">Híbrido (F9, F11 e Ctrl+K)</option>
+                <option value="classic">Dev-C++ 5.11 clássico</option>
               </select>
             </div>
           </div>
 
           <div class="toolchain-box">
             <div class="toolchain-box-header">
-              <strong>Toolchain Dev-C++ 5.11 (Somente Leitura)</strong>
+              <strong>Pasta do compilador Dev-C++ (somente leitura)</strong>
               <div style="display: flex; gap: 6px">
                 <button
                   class="btn btn-subtle"
                   id="btnPickToolchainDir"
                   type="button"
-                  style="height: 24px; font-size: 11px"
+                  style="height: 24px; font-size: 11.5px"
                 >
-                  Escolher Pasta
+                  Escolher pasta
                 </button>
                 <button
                   class="btn btn-subtle"
                   id="btnRefreshToolchain"
                   type="button"
-                  style="height: 24px; font-size: 11px"
+                  style="height: 24px; font-size: 11.5px"
                 >
                   Reverificar
                 </button>
@@ -747,7 +814,7 @@
             data-close-modal="settingsModal"
             type="button"
           >
-            Concluir
+            Fechar
           </button>
         </div>
       </div>

@@ -134,7 +134,7 @@ const state: AppState = {
   terminalChunks: [
     {
       cls: "term-muted",
-      text: "DEVSHOW C++ · Pronto para compilar, executar e depurar (F9 Compile · F11 Run · F5 Debug GDB · F7 Into · F8 Over)\n",
+      text: "DEVSHOW C++ pronto. Pressione F11 para compilar e executar, ou F5 para depurar passo a passo.\n",
     },
   ],
   compileLog: [
@@ -1127,10 +1127,10 @@ async function loadToolchain(): Promise<void> {
   const gcc = report.tools.find((t) => t.name === "gcc");
 
   el<HTMLSpanElement>("statusToolchain").textContent = gcc?.found
-    ? `Toolchain OK (${foundCount}/5 · gcc.exe)`
+    ? `Compilador pronto (${foundCount}/5)`
     : isTauriRuntime()
-      ? `Toolchain parcial (${foundCount}/5)`
-      : "Modo Navegador (Vite)";
+      ? `Compilador parcial (${foundCount}/5)`
+      : "Modo navegador";
 
   el<HTMLSpanElement>("statusDot").style.background = gcc?.found
     ? "var(--success)"
@@ -1168,8 +1168,10 @@ function renderAll(): void {
 
 function renderTabs(): void {
   const list = el<HTMLDivElement>("tabList");
+  const emptyState = el<HTMLDivElement>("editorEmptyState");
+  emptyState.classList.toggle("hidden", state.tabs.length > 0);
   if (state.tabs.length === 0) {
-    list.innerHTML = `<div class="editor-tab" style="cursor:default;opacity:0.6;">Nenhum arquivo aberto</div>`;
+    list.innerHTML = "";
     return;
   }
   list.innerHTML = state.tabs
@@ -1181,7 +1183,7 @@ function renderTabs(): void {
           <span class="file-dot ${dot}"></span>
           <span>${escapeHtml(tab.name)}</span>
           ${tab.dirty ? '<span class="dirty-dot" title="Alterações não salvas"></span>' : ""}
-          <button class="tab-close" data-close-tab="${escapeHtml(tab.path)}" type="button" title="Fechar aba (Ctrl+W)">×</button>
+          <button class="tab-close" data-close-tab="${escapeHtml(tab.path)}" type="button" title="Fechar aba (Ctrl+W)" aria-label="Fechar aba">×</button>
         </div>
       `;
     })
@@ -1192,15 +1194,15 @@ function renderBreadcrumb(): void {
   const tab = getActiveTab();
   el<HTMLSpanElement>("crumbWorkspace").textContent = state.workspaceDir
     ? baseName(state.workspaceDir)
-    : "Sem Workspace";
-  el<HTMLSpanElement>("crumbFile").textContent = tab ? tab.name : "—";
+    : "Sem pasta";
+  el<HTMLSpanElement>("crumbFile").textContent = tab ? tab.name : "Nenhum arquivo";
 
   const symbols = tab ? extractCSymbols(tab.content) : [];
   let activeSym = symbols[0]?.label ?? "(global)";
   for (const s of symbols) {
     if (s.line <= state.cursorLine) activeSym = s.label;
   }
-  el<HTMLSpanElement>("crumbSymbol").textContent = activeSym;
+  el<HTMLButtonElement>("crumbSymbol").textContent = activeSym;
 
   const lesson = tab
     ? ROTEIRO_LESSONS.find((l) => l.fileName === tab.name)
@@ -1208,8 +1210,10 @@ function renderBreadcrumb(): void {
   el<HTMLSpanElement>("blockChip").textContent = lesson
     ? `${lesson.block} (${lesson.split})`
     : tab
-      ? `${tab.ext.toUpperCase() || "TEXT"} · ${tab.dirty ? "Modificado" : "Salvo"}`
-      : "C11 · Pronto";
+      ? tab.dirty
+        ? "Modificado"
+        : "Salvo"
+      : "Pronto";
 }
 
 function renderSidebar(): void {
@@ -1226,29 +1230,29 @@ function renderSidebar(): void {
   const activeTab = getActiveTab();
 
   if (state.sidebarPanel === "roteiro") {
-    titleEl.textContent = "Roteiro C · 2º Semestre";
+    titleEl.textContent = "Roteiro de C (2º semestre)";
     body.innerHTML = ROTEIRO_LESSONS.map((lesson) => {
       const isCurrent = activeTab?.name === lesson.fileName;
       return `
-        <div class="roteiro-item ${isCurrent ? "active" : ""}" data-roteiro-file="${escapeHtml(lesson.fileName)}">
+        <button class="roteiro-item ${isCurrent ? "active" : ""}" data-roteiro-file="${escapeHtml(lesson.fileName)}" type="button">
           <div class="roteiro-meta">
             <span>${escapeHtml(lesson.time)}</span>
             <span>${escapeHtml(lesson.split)}</span>
           </div>
           <div class="roteiro-title">${escapeHtml(lesson.block)}</div>
           <div class="roteiro-desc">${escapeHtml(lesson.desc)}</div>
-          ${isCurrent ? `<div class="paper-note">✏️ ${escapeHtml(lesson.paper)}</div>` : ""}
-        </div>`;
+          ${isCurrent ? `<div class="paper-note">${escapeHtml(lesson.paper)}</div>` : ""}
+        </button>`;
     }).join("");
   } else if (state.sidebarPanel === "files") {
-    titleEl.textContent = "Arquivos do Workspace";
+    titleEl.textContent = "Arquivos da pasta";
     const headerTools = `
       <div class="sidebar-toolbar">
-        <button class="btn btn-subtle" id="sbOpenFolder" type="button" style="flex:1;height:26px;font-size:11.5px;">Abrir Pasta</button>
-        <button class="btn btn-subtle" id="sbNewFile" type="button" style="flex:1;height:26px;font-size:11.5px;">+ Novo .c</button>
+        <button class="btn btn-subtle" id="sbOpenFolder" type="button" style="flex:1;height:26px;font-size:11.5px;">Abrir pasta</button>
+        <button class="btn btn-subtle" id="sbNewFile" type="button" style="flex:1;height:26px;font-size:11.5px;">Novo arquivo</button>
       </div>
       <div class="tree-section-title">
-        <span>${escapeHtml(state.workspaceDir ? baseName(state.workspaceDir) : "SEM PASTA")}</span>
+        <span>${escapeHtml(state.workspaceDir ? baseName(state.workspaceDir) : "Nenhuma pasta")}</span>
         <span>${state.workspaceEntries.filter((e) => !e.is_dir).length}</span>
       </div>`;
 
@@ -1258,7 +1262,7 @@ function renderSidebar(): void {
             .map((entry) => {
               const pad = 8 + entry.depth * 14;
               if (entry.is_dir) {
-                return `<div class="tree-item dir-item" style="padding-left:${pad}px;">📁 ${escapeHtml(entry.name)}</div>`;
+                return `<div class="tree-item dir-item" style="padding-left:${pad}px;">${escapeHtml(entry.name)}/</div>`;
               }
               const active = entry.path === state.activePath;
               return `
@@ -1273,11 +1277,11 @@ function renderSidebar(): void {
 
     body.innerHTML = headerTools + treeHtml;
   } else if (state.sidebarPanel === "outline") {
-    titleEl.textContent = "Funções & Structs";
+    titleEl.textContent = "Funções e structs";
     const symbols = activeTab ? extractCSymbols(activeTab.content) : [];
     body.innerHTML = `
       <div class="tree-section-title">
-        <span>${escapeHtml(activeTab?.name ?? "ARQUIVO")}</span>
+        <span>${escapeHtml(activeTab?.name ?? "Arquivo atual")}</span>
         <span>${symbols.length}</span>
       </div>
       ${
@@ -1295,11 +1299,11 @@ function renderSidebar(): void {
           : `<div class="muted-hint" style="padding:8px;">Nenhuma função ou struct detectada no arquivo atual.</div>`
       }`;
   } else if (state.sidebarPanel === "search") {
-    titleEl.textContent = "Buscar no Workspace";
+    titleEl.textContent = "Buscar nos arquivos";
     body.innerHTML = `
-      <input class="text-input" id="sbSearchInput" style="width:100%;margin-bottom:8px;" placeholder="Pesquisar em .c / .h (ex: troca, Aluno)..." value="${escapeHtml(state.searchQuery)}" />
+      <input class="text-input" id="sbSearchInput" style="width:100%;margin-bottom:8px;" placeholder="Pesquisar em .c e .h (ex: troca, Aluno)" value="${escapeHtml(state.searchQuery)}" />
       <div class="tree-section-title">
-        <span>RESULTADOS</span>
+        <span>Resultados</span>
         <span>${state.searchResults.length}</span>
       </div>
       ${
@@ -1313,10 +1317,10 @@ function renderSidebar(): void {
               </button>`
               )
               .join("")
-          : `<div class="muted-hint" style="padding:8px;">Digite 2+ caracteres para buscar nos arquivos do workspace via Rust.</div>`
+          : `<div class="muted-hint" style="padding:8px;">Digite 2 ou mais caracteres para buscar nos arquivos da pasta.</div>`
       }`;
   } else if (state.sidebarPanel === "debug") {
-    titleEl.textContent = "Memória, Ponteiros & GDB";
+    titleEl.textContent = "Memória e depuração";
     const snap = state.debugSnapshot;
     const allBps: Array<{ path: string; name: string; line: number }> = [];
     state.breakpoints.forEach((lines, path) => {
@@ -1332,11 +1336,11 @@ function renderSidebar(): void {
               (v) => `
             <div class="watch-row" title="${escapeHtml(`${v.var_type} ${v.name}${v.address ? ` @ ${v.address}` : ""}`)}">
               <span class="watch-name">${escapeHtml(v.name)}</span>
-              <span class="watch-val">${escapeHtml(v.deref_value ? `${v.value} → ${v.deref_value}` : v.value)}</span>
+              <span class="watch-val">${escapeHtml(v.deref_value ? `${v.value} -> ${v.deref_value}` : v.value)}</span>
             </div>`
             )
             .join("")
-        : `<div class="muted-hint">${state.debugActive ? "Sem variáveis locais neste ponto." : "Inicie com F5 para inspecionar."}</div>`;
+        : `<div class="muted-hint">${state.debugActive ? "Sem variáveis locais neste ponto." : "Pressione F5 para inspecionar variáveis."}</div>`;
 
     const stackHtml =
       snap && snap.frames.length > 0
@@ -1352,40 +1356,43 @@ function renderSidebar(): void {
         : `<div class="muted-hint">Nenhuma pilha ativa.</div>`;
 
     body.innerHTML = `
-      <div class="debug-card">
-        <div class="debug-card-title">
-          <span>Memória &amp; Ponteiros (SVG)</span>
-          <span>${state.debugActive ? (snap ? `${escapeHtml(snap.func)}:${snap.line}` : "RODANDO") : "IDLE"}</span>
+      <div class="debug-section">
+        <div class="debug-section-title">
+          <span>Memória e ponteiros</span>
+          <span class="debug-section-meta">${state.debugActive ? (snap ? `${escapeHtml(snap.func)}:${snap.line}` : "Em execução") : "Inativo"}</span>
         </div>
         ${renderLiveMemoryPanel(snap)}
       </div>
 
-      <div class="debug-card">
-        <div class="debug-card-title">
-          <span>Variáveis Locais</span>
-          <span>${snap ? snap.variables.length : 0}</span>
+      <div class="debug-section">
+        <div class="debug-section-title">
+          <span>Variáveis locais</span>
+          <span class="debug-section-meta">${snap ? snap.variables.length : 0}</span>
         </div>
         ${localsHtml}
       </div>
 
-      <div class="debug-card">
-        <div class="debug-card-title"><span>Avaliar Expressão C</span></div>
+      <div class="debug-section">
+        <div class="debug-section-title"><span>Avaliar expressão C</span></div>
         <form class="eval-row" id="dbgEvalForm">
-          <input class="text-input" id="dbgEvalInput" style="flex:1;height:26px;font-family:var(--font-mono);font-size:11.5px;" placeholder="*p, &x, a->nota..." value="${escapeHtml(state.evalExpr)}" />
-          <button class="btn btn-subtle" type="submit" style="height:26px;font-size:11px;padding:0 8px;">Avaliar</button>
+          <input class="text-input" id="dbgEvalInput" style="flex:1;height:26px;font-family:var(--font-mono);font-size:11.5px;" placeholder="*p, &x, a->nota" value="${escapeHtml(state.evalExpr)}" />
+          <button class="btn btn-subtle" type="submit" style="height:26px;font-size:11.5px;padding:0 8px;">Avaliar</button>
         </form>
         ${state.evalOutput ? `<div class="eval-result">${escapeHtml(state.evalOutput)}</div>` : ""}
       </div>
 
-      <div class="debug-card">
-        <div class="debug-card-title"><span>Call Stack</span><span>${snap ? snap.frames.length : 0}</span></div>
+      <div class="debug-section">
+        <div class="debug-section-title">
+          <span>Pilha de chamadas</span>
+          <span class="debug-section-meta">${snap ? snap.frames.length : 0}</span>
+        </div>
         ${stackHtml}
       </div>
 
-      <div class="debug-card">
-        <div class="debug-card-title">
-          <span>Breakpoints (Calha CM6)</span>
-          <span>${allBps.length}</span>
+      <div class="debug-section">
+        <div class="debug-section-title">
+          <span>Pontos de parada</span>
+          <span class="debug-section-meta">${allBps.length}</span>
         </div>
         ${
           allBps.length > 0
@@ -1393,13 +1400,13 @@ function renderSidebar(): void {
                 .map(
                   (bp) => `
                 <button class="tree-item" data-search-path="${escapeHtml(bp.path)}" data-search-line="${bp.line}" type="button">
-                  <span style="width:8px;height:8px;border-radius:50%;background:var(--error);flex-shrink:0;"></span>
+                  <span style="width:7px;height:7px;border-radius:50%;background:var(--error);flex-shrink:0;"></span>
                   <span>${escapeHtml(bp.name)}</span>
                   <span class="ext-badge">Ln ${bp.line}</span>
                 </button>`
                 )
                 .join("")
-            : `<div class="muted-hint">Clique na calha esquerda ou pressione <strong>F4</strong>.</div>`
+            : `<div class="muted-hint">Clique à esquerda do número da linha ou pressione F4.</div>`
         }
       </div>`;
   }
@@ -1496,18 +1503,18 @@ function renderDrawer(): void {
 function renderStatus(): void {
   el<HTMLSpanElement>("statusCursor").textContent = `Ln ${state.cursorLine}, Col ${state.cursorCol}`;
   el<HTMLSpanElement>("statusWorkspacePath").textContent = state.workspaceDir
-    ? `Pasta: ${state.workspaceDir}`
-    : "Workspace: nenhum";
+    ? state.workspaceDir
+    : "Nenhuma pasta aberta";
 
   const errs = state.diagnostics.filter((d) => d.severity === "error").length;
   const warns = state.diagnostics.filter((d) => d.severity === "warning").length;
-  el<HTMLSpanElement>("statusDiag").textContent = state.isCompiling
+  el<HTMLButtonElement>("statusDiag").textContent = state.isCompiling
     ? "Compilando..."
     : state.debugActive
-      ? "Depurando (GDB)..."
+      ? "Depurando (GDB)"
       : state.isRunning
         ? "Executando..."
-        : `${errs} erro(s) · ${warns} aviso(s)`;
+        : `${errs} erro(s), ${warns} aviso(s)`;
 
   const profile =
     COMPILER_PROFILES.find((p) => p.id === state.selectedProfileId) ??
@@ -1522,7 +1529,7 @@ function renderStatus(): void {
         : "-A2 Java";
   el<HTMLSpanElement>("statusAStyle").textContent = `AStyle (${astyleLabel})`;
   el<HTMLSpanElement>("statusKeymap").textContent =
-    state.settings.keymap === "hybrid" ? "Keymap: Híbrido" : "Keymap: Clássico";
+    state.settings.keymap === "hybrid" ? "Atalhos: híbrido" : "Atalhos: clássico";
 }
 
 // ===================== TEMPLATES, SETTINGS & COMMAND PALETTE =====================
@@ -1578,27 +1585,27 @@ function applyTypography(): void {
 
 function getPaletteCommands(): PaletteCommand[] {
   const base: PaletteCommand[] = [
-    { cat: "Build", label: "Compile & Run (Compilar e Executar)", kbd: "F11", run: () => { void compileActiveFile(true); } },
-    { cat: "Build", label: "Compile (Compilar com gcc/g++)", kbd: "F9", run: () => { void compileActiveFile(false); } },
-    { cat: "Build", label: "Run (Executar último executável)", kbd: "F10", run: () => { void runCurrentProgram(); } },
-    { cat: "Build", label: "Parar Programa em Execução", kbd: "F6", run: () => { void stopExecution(); } },
-    { cat: "Debug", label: "Debug: Iniciar / Continuar (GDB/MI2)", kbd: "F5", run: () => { void startOrContinueDebug(); } },
-    { cat: "Debug", label: "Debug: Step Into (Entrar na Função)", kbd: "F7", run: () => { void stepIntoDebug(); } },
-    { cat: "Debug", label: "Debug: Step Over (Próxima Linha)", kbd: "F8", run: () => { void stepOverDebug(); } },
-    { cat: "Debug", label: "Debug: Parar Sessão GDB", kbd: "F6", run: () => { void stopDebugSession(); } },
-    { cat: "AStyle", label: "Formatar Código Atual com AStyle.exe", kbd: "Ctrl+Shift+A", run: () => { void formatActiveWithAStyle(); } },
-    { cat: "Arquivo", label: "Salvar Arquivo Atual", kbd: "Ctrl+S", run: () => { void saveActiveTab(false); } },
-    { cat: "Arquivo", label: "Salvar Como...", kbd: "Ctrl+Shift+S", run: () => { void saveActiveTab(true); } },
-    { cat: "Arquivo", label: "Abrir Pasta de Projeto", kbd: "Ctrl+Shift+O", run: () => { void handleOpenFolder(); } },
-    { cat: "Arquivo", label: "Abrir Arquivo .c/.h", kbd: "Ctrl+O", run: () => { void handleOpenFile(); } },
-    { cat: "Template", label: "Novo Arquivo a partir de Template C", kbd: "Ctrl+Shift+N", run: () => openModal("templateModal") },
-    { cat: "Editor", label: "Localizar e Substituir Inline", kbd: "Ctrl+F", run: () => primaryEditor.openFind() },
-    { cat: "Editor", label: "Autocomplete C", kbd: "Ctrl+Space", run: () => primaryEditor.triggerAutocomplete() },
-    { cat: "Editor", label: "Alternar Split View", kbd: "Ctrl+\\", run: () => { state.splitOpen = !state.splitOpen; syncSecondaryEditor(); } },
-    { cat: "Editor", label: "Alternar Breakpoint na Linha Atual", kbd: "F4", run: () => primaryEditor.toggleBreakpointAtCurrentLine() },
-    { cat: "Tema", label: "Alternar Tema Dark / Daylight Paper", kbd: "", run: () => applyTheme(state.settings.theme === "dark" ? "light" : "dark") },
-    { cat: "View", label: "Alternar Painel Inferior", kbd: "Ctrl+`", run: () => { state.drawerOpen = !state.drawerOpen; renderDrawer(); } },
-    { cat: "Config", label: "Configurações & Toolchain", kbd: "Ctrl+,", run: () => openModal("settingsModal") },
+    { cat: "Compilar", label: "Compilar e executar", kbd: "F11", run: () => { void compileActiveFile(true); } },
+    { cat: "Compilar", label: "Compilar com gcc/g++", kbd: "F9", run: () => { void compileActiveFile(false); } },
+    { cat: "Executar", label: "Executar último binário compilado", kbd: "F10", run: () => { void runCurrentProgram(); } },
+    { cat: "Executar", label: "Parar programa em execução", kbd: "F6", run: () => { void stopExecution(); } },
+    { cat: "Depurar", label: "Iniciar ou continuar depuração GDB", kbd: "F5", run: () => { void startOrContinueDebug(); } },
+    { cat: "Depurar", label: "Entrar na função (Step Into)", kbd: "F7", run: () => { void stepIntoDebug(); } },
+    { cat: "Depurar", label: "Avançar próxima linha (Step Over)", kbd: "F8", run: () => { void stepOverDebug(); } },
+    { cat: "Depurar", label: "Parar sessão de depuração", kbd: "F6", run: () => { void stopDebugSession(); } },
+    { cat: "Formatar", label: "Formatar arquivo atual com AStyle", kbd: "Ctrl+Shift+A", run: () => { void formatActiveWithAStyle(); } },
+    { cat: "Arquivo", label: "Salvar arquivo atual", kbd: "Ctrl+S", run: () => { void saveActiveTab(false); } },
+    { cat: "Arquivo", label: "Salvar como", kbd: "Ctrl+Shift+S", run: () => { void saveActiveTab(true); } },
+    { cat: "Arquivo", label: "Abrir pasta", kbd: "Ctrl+Shift+O", run: () => { void handleOpenFolder(); } },
+    { cat: "Arquivo", label: "Abrir arquivo .c ou .h", kbd: "Ctrl+O", run: () => { void handleOpenFile(); } },
+    { cat: "Template", label: "Novo arquivo a partir de template C", kbd: "Ctrl+Shift+N", run: () => openModal("templateModal") },
+    { cat: "Editor", label: "Localizar e substituir", kbd: "Ctrl+F", run: () => primaryEditor.openFind() },
+    { cat: "Editor", label: "Mostrar sugestões de código C", kbd: "Ctrl+Space", run: () => primaryEditor.triggerAutocomplete() },
+    { cat: "Editor", label: "Dividir editor lado a lado", kbd: "Ctrl+\\", run: () => { state.splitOpen = !state.splitOpen; syncSecondaryEditor(); } },
+    { cat: "Editor", label: "Alternar ponto de parada na linha atual", kbd: "F4", run: () => primaryEditor.toggleBreakpointAtCurrentLine() },
+    { cat: "Tema", label: "Alternar tema escuro e claro", kbd: "", run: () => { applyTheme(state.settings.theme === "dark" ? "light" : "dark"); void persistSettings(); } },
+    { cat: "Painel", label: "Mostrar ou ocultar painel inferior", kbd: "Ctrl+`", run: () => { state.drawerOpen = !state.drawerOpen; renderDrawer(); } },
+    { cat: "Ajustes", label: "Configurações e compilador", kbd: "Ctrl+,", run: () => openModal("settingsModal") },
   ];
 
   const lessons: PaletteCommand[] = ROTEIRO_LESSONS.map((l) => ({
@@ -1740,18 +1747,21 @@ function bindEvents(): void {
     toast(next === "dark" ? "Tema Obsidian Slate (Dark)" : "Tema Daylight Paper (Light)");
   });
   el<HTMLButtonElement>("btnSettings").addEventListener("click", () => openModal("settingsModal"));
-  el<HTMLSpanElement>("statusToolchainBtn").addEventListener("click", () => openModal("settingsModal"));
-  el<HTMLSpanElement>("statusDiag").addEventListener("click", () => {
+  el<HTMLButtonElement>("statusToolchainBtn").addEventListener("click", () => openModal("settingsModal"));
+  el<HTMLButtonElement>("statusDiag").addEventListener("click", () => {
     state.drawerOpen = true;
     state.drawerTab = "problems";
     renderDrawer();
   });
   el<HTMLButtonElement>("btnRefreshToolchain").addEventListener("click", () => { void loadToolchain(); });
 
-  // Editor bar
+  // Editor bar & Empty State actions
   el<HTMLButtonElement>("btnInlineFind").addEventListener("click", () => primaryEditor.openFind());
   el<HTMLButtonElement>("btnComplete").addEventListener("click", () => primaryEditor.triggerAutocomplete());
-  el<HTMLSpanElement>("crumbSymbol").addEventListener("click", () => {
+  el<HTMLButtonElement>("btnEmptyNewTemplate").addEventListener("click", () => openModal("templateModal"));
+  el<HTMLButtonElement>("btnEmptyOpenFile").addEventListener("click", () => { void handleOpenFile(); });
+  el<HTMLButtonElement>("btnEmptyRoteiro").addEventListener("click", () => { void openRoteiroWorkspace(); });
+  el<HTMLButtonElement>("crumbSymbol").addEventListener("click", () => {
     state.sidebarOpen = true;
     state.sidebarPanel = "outline";
     renderSidebar();

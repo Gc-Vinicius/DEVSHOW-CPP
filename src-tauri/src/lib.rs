@@ -3,6 +3,7 @@ mod debugger;
 mod formatter;
 mod fs_ops;
 mod runner;
+mod settings;
 mod toolchain;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,6 +33,8 @@ pub fn run() {
             debugger::debug_step_out,
             debugger::debug_evaluate,
             debugger::debug_stop,
+            settings::load_settings,
+            settings::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DEVSHOW C++");

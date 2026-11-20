@@ -9,6 +9,7 @@ import type {
   DebugSnapshot,
   FileContent,
   FormatResult,
+  PersistedSettingsDto,
   RoteiroSeedFile,
   RoteiroWorkspace,
   RunnerExitEvent,
@@ -242,4 +243,30 @@ export async function onDebugExited(
 ): Promise<UnlistenFn> {
   if (!isTauriRuntime()) return () => {};
   return listen<DebugExitEvent>("debug://exited", (ev) => handler(ev.payload));
+}
+
+const BROWSER_SETTINGS_KEY = "devshow_cpp_settings_v1";
+
+export async function loadSettings(): Promise<PersistedSettingsDto | null> {
+  if (!isTauriRuntime()) {
+    try {
+      const raw = window.localStorage.getItem(BROWSER_SETTINGS_KEY);
+      return raw ? (JSON.parse(raw) as PersistedSettingsDto) : null;
+    } catch {
+      return null;
+    }
+  }
+  return invoke<PersistedSettingsDto>("load_settings");
+}
+
+export async function saveSettings(settings: PersistedSettingsDto): Promise<void> {
+  if (!isTauriRuntime()) {
+    try {
+      window.localStorage.setItem(BROWSER_SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      // Ignore storage quota errors in browser preview
+    }
+    return;
+  }
+  return invoke<void>("save_settings", { settings });
 }

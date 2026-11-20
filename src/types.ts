@@ -137,6 +137,23 @@ export interface EditorSettings {
   tabSize: number;
   astyleStyle: "-A3" | "-A2" | "-A1";
   keymap: KeymapMode;
+  defaultProfileId: string;
+  toolchainBaseDir: string;
+  useConsolePauser: boolean;
+  lastWorkspaceDir: string | null;
+}
+
+export interface PersistedSettingsDto {
+  theme: string;
+  font_family: string;
+  font_size_px: number;
+  tab_size: number;
+  astyle_style: string;
+  keymap: string;
+  default_profile_id: string;
+  toolchain_base_dir: string;
+  use_console_pauser: boolean;
+  last_workspace_dir: string | null;
 }
 
 export interface DebugBreakpointSpec {

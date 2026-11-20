@@ -1,48 +1,36 @@
 # DEVSHOW C++
 
-IDE desktop moderna, leve e **C-first** construída com **Tauri v2 (Rust + WebView2)** e **TypeScript**, nascida a partir da engenharia reversa e reformulação da UI do **Dev-C++ 5.11**.
+IDE desktop moderna, leve, rápida e **C-first** construída em **Tauri v2 (Rust + WebView2 + TypeScript + Vite + CodeMirror 6)**, projetada a partir da engenharia reversa e reformulação da UI do Dev-C++ 5.11.
 
-## Objetivos
-- Manter a leveza, rapidez de inicialização e simplicidade do Dev-C++.
-- Reaproveitar diretamente o toolchain local do Windows (`MinGW64\bin\gcc.exe`, `g++.exe`, `gdb.exe`, `AStyle.exe` e `ConsolePauser.exe`).
-- Oferecer experiência moderna de edição, temas **Dark** e **Daylight Paper**, diagnósticos pedagógicos do GCC em português, **Visualizador de Memória & Ponteiros (SVG)** e **Teste de Mesa (Trace)** integrado ao GDB/MI.
+## Recursos Principais
 
-## Estrutura do Repositório
+- **Editor CodeMirror 6 C/C++**: syntax highlighting sincronizado aos temas **Obsidian Slate (Dark)** e **Daylight Paper (Light)**, calha clicável de breakpoints (`F4`), Find & Replace inline (`Ctrl+F`), Autocomplete C (`Ctrl+Space`) e Split View (`Ctrl+\`).
+- **Roteiro C Integrado + 6 Templates C-First**: inicializa um workspace real com os 7 exercícios cronológicos em C (`01_funcoes.c` … `07_desafio_integrado.c`) e permite criar novos `.c`/`.h` a partir de templates prontos (`Ctrl+Shift+N`).
+- **Compilação & Execução Real (MinGW64 / TDM-GCC)**: `F9` (Compile), `F10` (Run), `F11` (Compile & Run) sem piscar janelas CMD (`CREATE_NO_WINDOW`), parser de diagnósticos do GCC com **tradutor pedagógico em português** para erros clássicos em C, console integrado com `stdin`/`stdout` interativo (`scanf`/`fgets`), botão **Parar (`F6`)** e suporte opcional a `ConsolePauser.exe`.
+- **Formatação Real com AStyle (`Ctrl+Shift+A`)**: invoca o `AStyle.exe` local via pipe `stdin`/`stdout` preservando `Ctrl+Z` no editor.
+- **Depurador Real (`gdb.exe --interpreter=mi2`)**: `F5` (Iniciar/Continuar), `F7` (Step Into), `F8` (Step Over), `Shift+F8` (Step Out), `F6` (Parar), avaliador de expressões C, Call Stack clicável, **Visualizador de Memória & Ponteiros em SVG ao vivo** (endereços reais `&x` e setas `*p`) e tabela automática **Teste de Mesa (Trace)**.
+- **Preferências Persistentes**: tema, fonte, tamanho, tabulação, estilo AStyle, perfil de compilador, caminho do toolchain e último workspace salvos em `%APPDATA%\DEVSHOW-CPP\settings.json`.
 
-```text
-.
-├── src/                  # Frontend TypeScript + Vite (UI da IDE)
-├── src-tauri/            # Backend Rust (Tauri v2: IPC, toolchain, compilação e GDB/MI)
-└── docs/
-    ├── relatorio-engenharia-reversa-redesign.md  # Relatório completo da análise REA + redesign
-    ├── devcpp-modern-prototype.html              # Protótipo interativo aprovado
-    └── quickwin-devcpp-modern-dark.ini           # Tema rápido para o Dev-C++ 5.11 original
-```
-
-## Pré-requisitos
-- Windows 10/11 com **Microsoft Edge WebView2 Runtime**
-- **Node.js** + **npm**
-- **Rust (`rustup` / `cargo`)** + **Visual Studio C++ Build Tools**
-- **MinGW64** (ex.: instalação local do Dev-C++ em `C:\Program Files (x86)\Dev-Cpp\MinGW64`)
-
-## Como executar em desenvolvimento
+## Desenvolvimento e Build (Windows x64)
 
 ```powershell
+# Instalar dependências do frontend
 npm install
+
+# Executar o aplicativo desktop em modo desenvolvimento
 npm run tauri dev
-```
 
-## Build otimizado de produção
+# Validar frontend e backend
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml
 
-```powershell
+# Gerar executável e instalador otimizados de produção
 npm run tauri build
 ```
 
-## Roadmap
-- [x] Engenharia reversa do Dev-C++ 5.11 e especificação do redesign (`docs/`)
-- [x] Protótipo interativo C-first validado (`docs/devcpp-modern-prototype.html`)
-- [x] Scaffold base **Tauri v2** + detecção do toolchain local em Rust
-- [ ] MVP: editor real (CodeMirror 6 / Monaco), gerenciamento de arquivos `.c`/`.h`, compilação (`gcc.exe`), execução no console integrado e formatação (`AStyle.exe`)
-- [ ] Tradutor pedagógico de diagnósticos reais do GCC
-- [ ] Depurador real via `gdb.exe --interpreter=mi2` + Visualizador de Memória SVG e Teste de Mesa ao vivo
-- [ ] Empacotamento e instalador Windows (`.exe` / `.msi`)
+## Documentação de Engenharia Reversa e Design
+
+- [docs/relatorio-engenharia-reversa-redesign.md](docs/relatorio-engenharia-reversa-redesign.md)
+- [docs/devcpp-modern-prototype.html](docs/devcpp-modern-prototype.html)
+- [docs/quickwin-devcpp-modern-dark.ini](docs/quickwin-devcpp-modern-dark.ini)

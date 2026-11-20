@@ -1,8 +1,12 @@
 import {
+  acceptCompletion,
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
   completionKeymap,
+  nextSnippetField,
+  prevSnippetField,
+  snippetCompletion,
   startCompletion,
   type Completion,
   type CompletionContext,
@@ -29,6 +33,7 @@ import {
 import {
   Compartment,
   EditorState,
+  Prec,
   RangeSet,
   StateEffect,
   StateField,
@@ -164,16 +169,40 @@ function extractBreakpoints(state: EditorState): number[] {
 
 // ===================== C-FIRST AUTOCOMPLETE =====================
 const C_STANDARD_COMPLETIONS: Completion[] = [
-  { label: "printf", type: "function", detail: "<stdio.h>", apply: 'printf("%d\\n", );' },
-  { label: "scanf", type: "function", detail: "<stdio.h>", apply: 'scanf("%d", &);' },
-  { label: "fgets", type: "function", detail: "<stdio.h>", apply: "fgets(buf, sizeof(buf), stdin);" },
+  snippetCompletion('printf("${1:%d}\\n", ${2:valor});', {
+    label: "printf",
+    type: "function",
+    detail: "<stdio.h>",
+  }),
+  snippetCompletion('scanf("${1:%d}", &${2:var});', {
+    label: "scanf",
+    type: "function",
+    detail: "<stdio.h>",
+  }),
+  snippetCompletion("fgets(${1:buf}, sizeof(${1:buf}), stdin);", {
+    label: "fgets",
+    type: "function",
+    detail: "<stdio.h>",
+  }),
   { label: "fprintf", type: "function", detail: "<stdio.h>" },
-  { label: "malloc", type: "function", detail: "<stdlib.h>", apply: "malloc(n * sizeof(int))" },
+  snippetCompletion("malloc(${1:n} * sizeof(${2:int}))", {
+    label: "malloc",
+    type: "function",
+    detail: "<stdlib.h>",
+  }),
   { label: "calloc", type: "function", detail: "<stdlib.h>" },
   { label: "realloc", type: "function", detail: "<stdlib.h>" },
-  { label: "free", type: "function", detail: "<stdlib.h>", apply: "free();" },
+  snippetCompletion("free(${1:ptr});", {
+    label: "free",
+    type: "function",
+    detail: "<stdlib.h>",
+  }),
   { label: "sizeof", type: "keyword", detail: "operador C" },
-  { label: "typedef struct", type: "keyword", detail: "struct C", apply: "typedef struct {\n    \n} Nome;" },
+  snippetCompletion("typedef struct {\n\t${1:int campo;}\n} ${2:Nome};", {
+    label: "typedef struct",
+    type: "keyword",
+    detail: "struct C",
+  }),
   { label: "#include <stdio.h>", type: "keyword", detail: "entrada/saída" },
   { label: "#include <stdlib.h>", type: "keyword", detail: "memória/util" },
   { label: "#include <string.h>", type: "keyword", detail: "strings C" },
@@ -454,14 +483,24 @@ export class DevShowEditor {
         indentUnit.of(" ".repeat(tabSize)),
       ]),
       this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)),
+      // Tab aceita sugestão do autocomplete ou avança snippet ANTES do indentWithTab
+      Prec.highest(
+        keymap.of([
+          {
+            key: "Tab",
+            run: (view) => acceptCompletion(view) || nextSnippetField(view),
+          },
+          { key: "Shift-Tab", run: prevSnippetField },
+        ])
+      ),
       keymap.of([
-        indentWithTab,
+        ...completionKeymap,
         ...closeBracketsKeymap,
         ...defaultKeymap,
         ...searchKeymap,
         ...historyKeymap,
         ...foldKeymap,
-        ...completionKeymap,
+        indentWithTab,
       ]),
       EditorView.updateListener.of((update) => {
         if (update.docChanged && this.currentPath && !this.readOnly) {
